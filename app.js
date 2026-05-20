@@ -17,9 +17,8 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
 let currentUser = null;
-let currentLang = 'en'; // පෙරනිමි භාෂාව
+let currentLang = 'en'; 
 
-// --- Translations Dictionary (i18n) ---
 const dict = {
     en: {
         login_subtitle: "Keep your notes safe.", login_btn: "Sign in with Google", logout: "Logout",
@@ -27,7 +26,8 @@ const dict = {
         loading_notes: "Loading your notes...", no_notes: "No notes yet.",
         btn_back: "🔙 Back", btn_pen: "✒️ Pen", btn_eraser: "🧽 Eraser", btn_clear: "Clear", btn_save: "Save Note",
         saving: "Saving...", saved_success: "Note saved successfully!",
-        delete_confirm: "Are you sure you want to delete this note?", new_folder_prompt: "Enter new folder name:"
+        delete_confirm: "Are you sure you want to delete this note?", new_folder_prompt: "Enter new folder name:",
+        untitled_note: "Untitled Note" // අලුත් 
     },
     si: {
         login_subtitle: "ඔබගේ සටහන් ආරක්ෂිතව තබාගන්න.", login_btn: "Google හරහා ඇතුල් වන්න", logout: "ඉවත් වන්න",
@@ -35,7 +35,8 @@ const dict = {
         loading_notes: "සටහන් ලබා ගනිමින්...", no_notes: "තවම සටහන් කිසිවක් නැත.",
         btn_back: "🔙 ආපසු", btn_pen: "✒️ පෑන", btn_eraser: "🧽 මකනය", btn_clear: "මකන්න", btn_save: "සටහන සුරකින්න",
         saving: "සුරකිමින්...", saved_success: "සටහන සාර්ථකව සුරැකුවා!",
-        delete_confirm: "මෙම සටහන මකා දැමීමට අවශ්‍ය බව විශ්වාසද?", new_folder_prompt: "නව ගොනුවේ නම ඇතුලත් කරන්න:"
+        delete_confirm: "මෙම සටහන මකා දැමීමට අවශ්‍ය බව විශ්වාසද?", new_folder_prompt: "නව ගොනුවේ නම ඇතුලත් කරන්න:",
+        untitled_note: "නමක් නැති සටහන" // අලුත්
     },
     ko: {
         login_subtitle: "노트를 안전하게 보관하세요.", login_btn: "Google로 로그인", logout: "로그아웃",
@@ -43,28 +44,25 @@ const dict = {
         loading_notes: "노트를 불러오는 중...", no_notes: "아직 노트가 없습니다.",
         btn_back: "🔙 뒤로", btn_pen: "✒️ 펜", btn_eraser: "🧽 지우개", btn_clear: "지우기", btn_save: "노트 저장",
         saving: "저장 중...", saved_success: "노트가 성공적으로 저장되었습니다!",
-        delete_confirm: "이 노트를 삭제하시겠습니까?", new_folder_prompt: "새 폴더 이름을 입력하세요:"
+        delete_confirm: "이 노트를 삭제하시겠습니까?", new_folder_prompt: "새 폴더 이름을 입력하세요:",
+        untitled_note: "제목 없는 노트" // අලුත්
     }
 };
 
-// DOM Elements
 const loginPage = document.getElementById('loginPage');
 const appContainer = document.getElementById('appContainer');
 const homePage = document.getElementById('homePage');
 const drawingPage = document.getElementById('drawingPage');
 const userEmailBadge = document.getElementById('userEmailBadge');
 const languageSelect = document.getElementById('languageSelect');
+const noteTitleInput = document.getElementById('noteTitleInput');
+const pageIndicator = document.getElementById('pageIndicator');
 
-// --- Language Management Logic ---
 function applyLanguage(lang) {
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
-        if (dict[lang] && dict[lang][key]) {
-            el.innerHTML = dict[lang][key];
-        }
+        if (dict[lang] && dict[lang][key]) el.innerHTML = dict[lang][key];
     });
-    
-    // Dynamic text updates
     renderFolders();
     if(appContainer.style.display === 'flex') loadNotes();
 }
@@ -72,57 +70,36 @@ function applyLanguage(lang) {
 languageSelect.addEventListener('change', async (e) => {
     currentLang = e.target.value;
     applyLanguage(currentLang);
-    // User ලොග් වෙලා ඉන්නවා නම් අලුත් භාෂාව Database එකේ සේව් කරන්න
-    if (currentUser) {
-        await setDoc(doc(db, "users", currentUser.uid), { language: currentLang }, { merge: true });
-    }
+    if (currentUser) await setDoc(doc(db, "users", currentUser.uid), { language: currentLang }, { merge: true });
 });
 
 async function loadUserLanguage(uid) {
     try {
-        const userRef = doc(db, "users", uid);
-        const userSnap = await getDoc(userRef);
-        if (userSnap.exists() && userSnap.data().language) {
-            currentLang = userSnap.data().language;
-        } else {
-            // පළමු වතාවට ආපු කෙනෙක් නම් Default එක සේව් කරන්න
-            await setDoc(userRef, { language: 'en' }, { merge: true });
-        }
+        const userSnap = await getDoc(doc(db, "users", uid));
+        if (userSnap.exists() && userSnap.data().language) currentLang = userSnap.data().language;
+        else await setDoc(doc(db, "users", uid), { language: 'en' }, { merge: true });
         languageSelect.value = currentLang;
         applyLanguage(currentLang);
-    } catch (e) {
-        console.error("Error loading language pref:", e);
-    }
+    } catch (e) { console.error(e); }
 }
 
-// --- Auth Logic ---
 onAuthStateChanged(auth, async (user) => {
     if (user) {
-        currentUser = user;
-        userEmailBadge.innerText = user.email;
-        loginPage.style.display = 'none';
-        appContainer.style.display = 'flex';
-        
-        // භාෂාව සහ සටහන් Load කිරීම
-        await loadUserLanguage(user.uid);
-        loadNotes();
+        currentUser = user; userEmailBadge.innerText = user.email;
+        loginPage.style.display = 'none'; appContainer.style.display = 'flex';
+        await loadUserLanguage(user.uid); loadNotes();
     } else {
-        currentUser = null;
-        loginPage.style.display = 'flex';
-        appContainer.style.display = 'none';
-        applyLanguage('en'); // ලොග් අවුට් වුනාම English වලට හැරවීම
+        currentUser = null; loginPage.style.display = 'flex'; appContainer.style.display = 'none';
+        applyLanguage('en'); 
     }
 });
-
 document.getElementById('btnLoginGoogle').onclick = () => signInWithPopup(auth, provider);
 document.getElementById('btnLogout').onclick = () => signOut(auth);
 
-// --- Theme Logic ---
 const btnThemeToggle = document.getElementById('btnThemeToggle');
 let isDarkMode = localStorage.getItem('theme') === 'dark';
 document.documentElement.setAttribute('data-bs-theme', isDarkMode ? 'dark' : 'light');
 btnThemeToggle.innerText = isDarkMode ? '☀️' : '🌙';
-
 btnThemeToggle.onclick = () => {
     isDarkMode = !isDarkMode;
     document.documentElement.setAttribute('data-bs-theme', isDarkMode ? 'dark' : 'light');
@@ -130,13 +107,10 @@ btnThemeToggle.onclick = () => {
     btnThemeToggle.innerText = isDarkMode ? '☀️' : '🌙';
 };
 
-// --- Folders Logic ---
 let folders = JSON.parse(localStorage.getItem('notebook_folders')) || ['All', 'Work', 'Personal'];
 let currentFolder = 'All';
-
 function renderFolders() {
-    const list = document.getElementById('folderList');
-    list.innerHTML = '';
+    const list = document.getElementById('folderList'); list.innerHTML = '';
     folders.forEach(folder => {
         const div = document.createElement('div');
         div.className = `folder-item mb-1 ${folder === currentFolder ? 'active' : ''}`;
@@ -147,30 +121,110 @@ function renderFolders() {
 }
 document.getElementById('btnNewFolder').onclick = () => {
     const name = prompt(dict[currentLang].new_folder_prompt);
-    if (name && !folders.includes(name)) {
-        folders.push(name);
-        localStorage.setItem('notebook_folders', JSON.stringify(folders));
-        renderFolders();
-    }
+    if (name && !folders.includes(name)) { folders.push(name); localStorage.setItem('notebook_folders', JSON.stringify(folders)); renderFolders(); }
 };
 
-// --- Canvas & Drawing Logic ---
 const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
 let isDrawing = false, lastX = 0, lastY = 0, currentTool = 'pen', currentEditingNoteId = null;
 
-function openCanvas(editingId = null, imageUrl = null) {
+// --- අලුත්: Multiple Pages Logic ---
+let notePages = []; // පිටු ටික සේව් වෙන Array එක
+let currentPageIndex = 0; // දැනට ඉන්න පිටුව
+
+function openCanvas(editingId = null, noteData = null) {
     currentEditingNoteId = editingId;
     homePage.style.display = 'none';
     drawingPage.style.display = 'block';
     resizeCanvas();
-    if (imageUrl) {
+    
+    if (noteData) {
+        // පරණ Notes (image විතරක් තියෙන) සහ අලුත් Notes (pages array තියෙන) දෙකම වැඩ කරන්න
+        if (noteData.pages && noteData.pages.length > 0) {
+            notePages = [...noteData.pages];
+        } else if (noteData.image) {
+            notePages = [noteData.image]; 
+        } else {
+            notePages = [];
+        }
+        noteTitleInput.value = noteData.title || dict[currentLang].untitled_note;
+    } else {
+        notePages = [];
+        noteTitleInput.value = dict[currentLang].untitled_note;
+    }
+    
+    currentPageIndex = 0;
+    renderCurrentPage();
+}
+
+// කැන්වසය මත දැනට ඉන්න පිටුව Render කිරීම
+function renderCurrentPage() {
+    clearCanvas();
+    if (notePages[currentPageIndex]) {
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
-        img.src = imageUrl;
+        img.src = notePages[currentPageIndex];
     }
+    updatePageIndicator();
 }
+
+function updatePageIndicator() {
+    let total = Math.max(notePages.length, currentPageIndex + 1);
+    pageIndicator.innerText = `${currentPageIndex + 1} / ${total}`;
+}
+
+// අලුත් පිටුවට යන්න කලින් දැනට තියෙන එක Array එකට සේව් කිරීම
+function saveCurrentPageToArray() {
+    notePages[currentPageIndex] = canvas.toDataURL('image/png');
+}
+
+// --- Page Turn Animations & Navigation ---
+function goToNextPage() {
+    saveCurrentPageToArray();
+    currentPageIndex++;
+    
+    // Animation
+    canvas.classList.remove('page-turn-next', 'page-turn-prev');
+    void canvas.offsetWidth; // Trigger reflow
+    canvas.classList.add('page-turn-next');
+    
+    setTimeout(() => { renderCurrentPage(); }, 300); // ඇනිමේෂන් එක මැදදි ලෝඩ් වීම
+}
+
+function goToPrevPage() {
+    if (currentPageIndex === 0) return;
+    saveCurrentPageToArray();
+    currentPageIndex--;
+    
+    canvas.classList.remove('page-turn-next', 'page-turn-prev');
+    void canvas.offsetWidth; 
+    canvas.classList.add('page-turn-prev');
+    
+    setTimeout(() => { renderCurrentPage(); }, 300);
+}
+
+document.getElementById('btnNextPage').onclick = goToNextPage;
+document.getElementById('btnPrevPage').onclick = goToPrevPage;
+
+// --- Touch Swipe Logic for Pages ---
+let touchStartX = 0;
+canvas.addEventListener('touchstart', e => {
+    // ඇඟිල්ලෙන් ස්පර්ශ කරනවද කියලා බලනවා (Stylus නම් නෙමෙයි)
+    if (e.touches[0].touchType !== 'stylus' && e.pointerType !== 'pen') {
+        touchStartX = e.changedTouches[0].screenX;
+    }
+}, {passive: true});
+
+canvas.addEventListener('touchend', e => {
+    if (e.changedTouches[0].touchType !== 'stylus' && e.pointerType !== 'pen') {
+        let touchEndX = e.changedTouches[0].screenX;
+        // වමට Swipe කිරීම (Next)
+        if (touchEndX < touchStartX - 100) goToNextPage();
+        // දකුණට Swipe කිරීම (Prev)
+        if (touchEndX > touchStartX + 100) goToPrevPage();
+    }
+});
 
 document.getElementById('btnCreateNote').onclick = () => openCanvas();
 document.getElementById('btnBack').onclick = () => { drawingPage.style.display = 'none'; homePage.style.display = 'flex'; loadNotes(); };
@@ -178,7 +232,7 @@ document.getElementById('btnBack').onclick = () => { drawingPage.style.display =
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    if (!currentEditingNoteId) clearCanvas();
+    renderCurrentPage(); 
 }
 window.addEventListener('resize', () => { if (drawingPage.style.display === 'block') resizeCanvas(); });
 
@@ -240,24 +294,28 @@ const btnPen = document.getElementById('btnPen'), btnEraser = document.getElemen
 btnPen.onclick = () => { currentTool = 'pen'; btnPen.classList.replace('btn-outline-primary', 'btn-primary'); btnEraser.classList.replace('btn-primary', 'btn-outline-primary'); };
 btnEraser.onclick = () => { currentTool = 'eraser'; btnEraser.classList.replace('btn-outline-primary', 'btn-primary'); btnPen.classList.replace('btn-primary', 'btn-outline-primary'); };
 
-// --- Save Note ---
+// --- Modified Save Logic (Array + Title) ---
 document.getElementById('saveBtn').onclick = async () => {
     if(!currentUser) return;
     try {
         const btn = document.getElementById('saveBtn');
         btn.innerText = dict[currentLang].saving; 
         btn.disabled = true;
-        const imageDataUrl = canvas.toDataURL('image/png');
+        
+        saveCurrentPageToArray(); // අන්තිමට ඇඳපු එකත් array එකට දාගන්නවා
+
+        const noteDataToSave = {
+            uid: currentUser.uid, 
+            pages: notePages, // මුළු Array එකම සේව් කරනවා
+            title: noteTitleInput.value, // අලුත් Title එක සේව් කරනවා
+            folder: currentFolder === 'All' ? 'Personal' : currentFolder
+        };
 
         if (currentEditingNoteId) {
-            await updateDoc(doc(db, "notes", currentEditingNoteId), { image: imageDataUrl, folder: currentFolder });
+            await updateDoc(doc(db, "notes", currentEditingNoteId), noteDataToSave);
         } else {
-            await addDoc(collection(db, "notes"), { 
-                uid: currentUser.uid, 
-                image: imageDataUrl, 
-                folder: currentFolder === 'All' ? 'Personal' : currentFolder, 
-                createdAt: serverTimestamp() 
-            });
+            noteDataToSave.createdAt = serverTimestamp();
+            await addDoc(collection(db, "notes"), noteDataToSave);
         }
         
         alert(dict[currentLang].saved_success);
@@ -294,6 +352,10 @@ async function loadNotes() {
             
             if (currentFolder !== 'All' && noteFolder !== currentFolder) return;
 
+            // Thumbnail එක විදිහට පළවෙනි පිටුව පෙන්වීම
+            const thumbnail = (data.pages && data.pages.length > 0) ? data.pages[0] : data.image;
+            const title = data.title || dict[currentLang].untitled_note;
+
             const div = document.createElement('div');
             div.className = 'col-lg-3 col-md-4 col-sm-6';
             
@@ -301,7 +363,8 @@ async function loadNotes() {
 
             div.innerHTML = `
                 <div class="note-card bg-body-tertiary">
-                    <img src="${data.image}" title="Click to Edit">
+                    <div class="p-2 fw-bold text-center border-bottom text-truncate">${title}</div>
+                    <img src="${thumbnail}" title="Click to Edit">
                     <div class="note-actions">
                         <select class="form-select form-select-sm w-auto move-folder-select" data-id="${docSnap.id}">
                             ${folderOptions}
@@ -311,7 +374,8 @@ async function loadNotes() {
                 </div>
             `;
 
-            div.querySelector('img').onclick = () => openCanvas(docSnap.id, data.image);
+            // මුළු Note Data එකම Open Canvas එකට යවනවා
+            div.querySelector('img').onclick = () => openCanvas(docSnap.id, data);
             
             div.querySelector('.delete-btn').onclick = async (e) => {
                 if(confirm(dict[currentLang].delete_confirm)) {

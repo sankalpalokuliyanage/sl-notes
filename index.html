@@ -14,21 +14,12 @@
             transition: background-color 0.3s;
         }
 
-        /* --- Login Page --- */
-        #loginPage {
-            height: 100vh; display: flex; flex-direction: column;
-            justify-content: center; align-items: center; z-index: 2000;
-        }
-
-        /* --- Main App Layout --- */
+        #loginPage { height: 100vh; display: flex; flex-direction: column; justify-content: center; align-items: center; z-index: 2000; }
         #appContainer { display: none; height: 100vh; flex-direction: column; }
-        
         #homePage { display: flex; flex: 1; overflow: hidden; flex-direction: column; }
         .main-layout { display: flex; flex: 1; overflow: hidden; }
-        
         .sidebar { width: 250px; padding: 20px; border-right: 1px solid var(--bs-border-color); overflow-y: auto; }
         .content-area { flex: 1; padding: 20px; overflow-y: auto; }
-
         .folder-item { cursor: pointer; padding: 10px; border-radius: 8px; transition: 0.2s; font-weight: 500; }
         .folder-item:hover { background: var(--bs-tertiary-bg); }
         .folder-item.active { background: #0d6efd; color: white; }
@@ -38,24 +29,47 @@
         
         #drawingCanvas { display: block; background-color: #ffffff; cursor: crosshair; touch-action: none; }
 
+        /* Floating Toolbar (Moved slightly down to make room for Title Bar) */
         .floating-toolbar {
-            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            position: absolute; top: 70px; left: 50%; transform: translateX(-50%);
             background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(15px);
             border-radius: 50px; padding: 10px 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
             display: flex; gap: 15px; align-items: center; z-index: 1000; border: 1px solid rgba(255,255,255,0.3);
         }
         
-        [data-bs-theme="dark"] .floating-toolbar {
-            background: rgba(33, 37, 41, 0.7); border: 1px solid rgba(255,255,255,0.1);
-        }
+        [data-bs-theme="dark"] .floating-toolbar { background: rgba(33, 37, 41, 0.7); border: 1px solid rgba(255,255,255,0.1); }
         
         .note-card { border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
         .note-card img { width: 100%; height: 200px; object-fit: cover; border-bottom: 1px solid var(--bs-border-color); cursor: pointer; background: white; }
         .note-actions { padding: 10px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+        .brand-footer { position: fixed; bottom: 10px; right: 15px; font-size: 0.75rem; font-weight: bold; opacity: 0.6; pointer-events: none; z-index: 9999; }
 
-        .brand-footer {
-            position: fixed; bottom: 10px; right: 15px;
-            font-size: 0.75rem; font-weight: bold; opacity: 0.6; pointer-events: none; z-index: 9999;
+        /* --- අලුතින් එකතු කල Title Bar එක --- */
+        .drawing-top-bar {
+            position: absolute; top: 0; left: 0; width: 100%; z-index: 1001;
+            background: var(--bs-body-bg); border-bottom: 1px solid var(--bs-border-color);
+            display: flex; justify-content: space-between; align-items: center; padding: 10px 20px;
+        }
+        .note-title-input {
+            border: none; background: transparent; font-weight: bold; font-size: 1.2rem;
+            color: var(--bs-body-color); text-align: center; outline: none; width: 300px;
+        }
+
+        /* --- අලුතින් එකතු කල Page Turn Animation --- */
+        .page-turn-next { animation: flipNext 0.6s ease-in-out forwards; }
+        .page-turn-prev { animation: flipPrev 0.6s ease-in-out forwards; }
+
+        @keyframes flipNext {
+            0% { transform: perspective(1500px) rotateY(0deg); opacity: 1; }
+            49% { transform: perspective(1500px) rotateY(-90deg); opacity: 0; }
+            50% { transform: perspective(1500px) rotateY(90deg); opacity: 0; }
+            100% { transform: perspective(1500px) rotateY(0deg); opacity: 1; }
+        }
+        @keyframes flipPrev {
+            0% { transform: perspective(1500px) rotateY(0deg); opacity: 1; }
+            49% { transform: perspective(1500px) rotateY(90deg); opacity: 0; }
+            50% { transform: perspective(1500px) rotateY(-90deg); opacity: 0; }
+            100% { transform: perspective(1500px) rotateY(0deg); opacity: 1; }
         }
     </style>
 </head>
@@ -65,14 +79,11 @@
     <div class="card shadow-lg border-0 p-5 text-center" style="max-width: 400px; border-radius: 20px;">
         <h2 class="fw-bold text-primary mb-3">SL-NOTEBOOK</h2>
         <p class="text-muted mb-4" data-i18n="login_subtitle">ඔබගේ සටහන් ආරක්ෂිතව තබාගන්න.</p>
-        <button class="btn btn-dark btn-lg rounded-pill" id="btnLoginGoogle" data-i18n="login_btn">
-            Sign in with Google
-        </button>
+        <button class="btn btn-dark btn-lg rounded-pill" id="btnLoginGoogle" data-i18n="login_btn">Sign in with Google</button>
     </div>
 </div>
 
 <div id="appContainer">
-    
     <div class="px-4 py-3 border-bottom d-flex justify-content-between align-items-center bg-body flex-wrap gap-2">
         <div class="d-flex align-items-center gap-3">
             <h3 class="fw-bold text-primary m-0">SL-NOTEBOOK</h3>
@@ -84,7 +95,6 @@
                 <option value="si">සිංහල</option>
                 <option value="ko">한국어</option>
             </select>
-            
             <button class="btn btn-outline-secondary rounded-circle" id="btnThemeToggle" title="Toggle Dark/Light Mode">🌙</button>
             <button class="btn btn-outline-danger btn-sm rounded-pill" id="btnLogout" data-i18n="logout">Logout</button>
             <button class="btn btn-primary rounded-pill shadow-sm fw-bold" id="btnCreateNote" data-i18n="new_note">✏️ New Note</button>
@@ -100,7 +110,6 @@
                 </div>
                 <div id="folderList"></div>
             </div>
-
             <div class="content-area bg-body">
                 <h4 class="mb-4 fw-bold" id="currentFolderTitle">All Notes</h4>
                 <div class="row g-4" id="notesGrid"></div>
@@ -109,9 +118,19 @@
     </div>
 
     <div id="drawingPage">
+        <div class="drawing-top-bar">
+            <button class="btn btn-secondary rounded-pill fw-bold btn-sm" id="btnBack" data-i18n="btn_back">🔙 Back</button>
+            
+            <input type="text" id="noteTitleInput" class="note-title-input" value="Untitled Note" placeholder="Note Title...">
+            
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-secondary rounded-circle" id="btnPrevPage">◀</button>
+                <span class="fw-bold text-muted small" id="pageIndicator">1 / 1</span>
+                <button class="btn btn-sm btn-outline-secondary rounded-circle" id="btnNextPage">▶</button>
+            </div>
+        </div>
+
         <div class="floating-toolbar">
-            <button class="btn btn-secondary rounded-pill fw-bold" id="btnBack" data-i18n="btn_back">🔙 Back</button>
-            <div class="vr mx-1"></div>
             <div class="btn-group">
                 <button class="btn btn-primary active" id="btnPen" data-i18n="btn_pen">✒️ Pen</button>
                 <button class="btn btn-outline-primary" id="btnEraser" data-i18n="btn_eraser">🧽 Eraser</button>
@@ -126,6 +145,7 @@
             <div class="vr mx-1"></div>
             <button class="btn btn-success rounded-pill fw-bold" id="saveBtn" data-i18n="btn_save">Save Note</button>
         </div>
+        
         <canvas id="drawingCanvas"></canvas>
     </div>
 </div>
