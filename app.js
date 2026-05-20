@@ -27,7 +27,7 @@ const dict = {
         btn_back: "🔙 Back", btn_pen: "✒️ Pen", btn_eraser: "🧽 Eraser", btn_clear: "Clear", btn_save: "Save Note",
         saving: "Saving...", saved_success: "Note saved successfully!",
         delete_confirm: "Are you sure you want to delete this note?", new_folder_prompt: "Enter new folder name:",
-        untitled_note: "Untitled Note" // අලුත් 
+        untitled_note: "Untitled Note"
     },
     si: {
         login_subtitle: "ඔබගේ සටහන් ආරක්ෂිතව තබාගන්න.", login_btn: "Google හරහා ඇතුල් වන්න", logout: "ඉවත් වන්න",
@@ -36,7 +36,7 @@ const dict = {
         btn_back: "🔙 ආපසු", btn_pen: "✒️ පෑන", btn_eraser: "🧽 මකනය", btn_clear: "මකන්න", btn_save: "සටහන සුරකින්න",
         saving: "සුරකිමින්...", saved_success: "සටහන සාර්ථකව සුරැකුවා!",
         delete_confirm: "මෙම සටහන මකා දැමීමට අවශ්‍ය බව විශ්වාසද?", new_folder_prompt: "නව ගොනුවේ නම ඇතුලත් කරන්න:",
-        untitled_note: "නමක් නැති සටහන" // අලුත්
+        untitled_note: "නමක් නැති සටහන"
     },
     ko: {
         login_subtitle: "노트를 안전하게 보관하세요.", login_btn: "Google로 로그인", logout: "로그아웃",
@@ -45,7 +45,7 @@ const dict = {
         btn_back: "🔙 뒤로", btn_pen: "✒️ 펜", btn_eraser: "🧽 지우개", btn_clear: "지우기", btn_save: "노트 저장",
         saving: "저장 중...", saved_success: "노트가 성공적으로 저장되었습니다!",
         delete_confirm: "이 노트를 삭제하시겠습니까?", new_folder_prompt: "새 폴더 이름을 입력하세요:",
-        untitled_note: "제목 없는 노트" // අලුත්
+        untitled_note: "제목 없는 노트"
     }
 };
 
@@ -93,6 +93,7 @@ onAuthStateChanged(auth, async (user) => {
         applyLanguage('en'); 
     }
 });
+
 document.getElementById('btnLoginGoogle').onclick = () => signInWithPopup(auth, provider);
 document.getElementById('btnLogout').onclick = () => signOut(auth);
 
@@ -128,9 +129,9 @@ const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
 let isDrawing = false, lastX = 0, lastY = 0, currentTool = 'pen', currentEditingNoteId = null;
 
-// --- අලුත්: Multiple Pages Logic ---
-let notePages = []; // පිටු ටික සේව් වෙන Array එක
-let currentPageIndex = 0; // දැනට ඉන්න පිටුව
+// --- Multiple Pages Logic ---
+let notePages = []; 
+let currentPageIndex = 0; 
 
 function openCanvas(editingId = null, noteData = null) {
     currentEditingNoteId = editingId;
@@ -139,7 +140,6 @@ function openCanvas(editingId = null, noteData = null) {
     resizeCanvas();
     
     if (noteData) {
-        // පරණ Notes (image විතරක් තියෙන) සහ අලුත් Notes (pages array තියෙන) දෙකම වැඩ කරන්න
         if (noteData.pages && noteData.pages.length > 0) {
             notePages = [...noteData.pages];
         } else if (noteData.image) {
@@ -157,7 +157,6 @@ function openCanvas(editingId = null, noteData = null) {
     renderCurrentPage();
 }
 
-// කැන්වසය මත දැනට ඉන්න පිටුව Render කිරීම
 function renderCurrentPage() {
     clearCanvas();
     if (notePages[currentPageIndex]) {
@@ -174,7 +173,6 @@ function updatePageIndicator() {
     pageIndicator.innerText = `${currentPageIndex + 1} / ${total}`;
 }
 
-// අලුත් පිටුවට යන්න කලින් දැනට තියෙන එක Array එකට සේව් කිරීම
 function saveCurrentPageToArray() {
     notePages[currentPageIndex] = canvas.toDataURL('image/png');
 }
@@ -184,12 +182,11 @@ function goToNextPage() {
     saveCurrentPageToArray();
     currentPageIndex++;
     
-    // Animation
     canvas.classList.remove('page-turn-next', 'page-turn-prev');
-    void canvas.offsetWidth; // Trigger reflow
+    void canvas.offsetWidth; 
     canvas.classList.add('page-turn-next');
     
-    setTimeout(() => { renderCurrentPage(); }, 300); // ඇනිමේෂන් එක මැදදි ලෝඩ් වීම
+    setTimeout(() => { renderCurrentPage(); }, 300); 
 }
 
 function goToPrevPage() {
@@ -210,18 +207,15 @@ document.getElementById('btnPrevPage').onclick = goToPrevPage;
 // --- Touch Swipe Logic for Pages ---
 let touchStartX = 0;
 canvas.addEventListener('touchstart', e => {
-    // ඇඟිල්ලෙන් ස්පර්ශ කරනවද කියලා බලනවා (Stylus නම් නෙමෙයි)
-    if (e.touches[0].touchType !== 'stylus' && e.pointerType !== 'pen') {
-        touchStartX = e.changedTouches[0].screenX;
+    if (e.touches[0] && e.touches[0].touchType !== 'stylus' && e.pointerType !== 'pen') {
+        touchStartX = e.touches[0].screenX;
     }
 }, {passive: true});
 
 canvas.addEventListener('touchend', e => {
-    if (e.changedTouches[0].touchType !== 'stylus' && e.pointerType !== 'pen') {
+    if (e.changedTouches[0] && e.changedTouches[0].touchType !== 'stylus' && e.pointerType !== 'pen') {
         let touchEndX = e.changedTouches[0].screenX;
-        // වමට Swipe කිරීම (Next)
         if (touchEndX < touchStartX - 100) goToNextPage();
-        // දකුණට Swipe කිරීම (Prev)
         if (touchEndX > touchStartX + 100) goToPrevPage();
     }
 });
@@ -246,8 +240,10 @@ function getPointerPos(e) {
     return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
 }
 
+// --- BUG FIX: Fixed iPad Pointer Drawing Logic ---
 function startDrawing(e) {
     if (e.pointerType !== 'pen') return;
+    if (e.cancelable) e.preventDefault();
     isDrawing = true;
     const pos = getPointerPos(e);
     lastX = pos.x; lastY = pos.y;
@@ -255,11 +251,14 @@ function startDrawing(e) {
 
 function draw(e) {
     if (!isDrawing) return;
+    if (e.pointerType !== 'pen') return; 
+    
     if (e.cancelable) e.preventDefault(); 
-    if (e.pointerType !== 'pen') return;
     
     const pos = getPointerPos(e);
-    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(pos.x, pos.y);
+    ctx.beginPath(); 
+    ctx.moveTo(lastX, lastY); 
+    ctx.lineTo(pos.x, pos.y);
     
     let pressure = e.pressure !== undefined ? e.pressure : 1; 
     let baseWidth = parseFloat(document.getElementById('brushSize').value);
@@ -269,24 +268,27 @@ function draw(e) {
         ctx.lineWidth = baseWidth * 6;
     } else {
         ctx.strokeStyle = document.getElementById('colorPicker').value;
-        ctx.lineWidth = baseWidth * (pressure * 2);
+        ctx.lineWidth = baseWidth * (pressure * 2); 
     }
     
-    ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.stroke();
+    ctx.lineCap = 'round'; 
+    ctx.lineJoin = 'round'; 
+    ctx.stroke();
     lastX = pos.x; lastY = pos.y;
 }
 
 function stopDrawing(e) {
-    if (e.pointerType !== 'pen') return; 
+    if (e.pointerType !== 'pen') return;
+    if (e.cancelable) e.preventDefault();
     isDrawing = false;
     ctx.beginPath();
 }
 
-canvas.addEventListener('pointerdown', startDrawing);
+canvas.addEventListener('pointerdown', startDrawing, { passive: false });
 canvas.addEventListener('pointermove', draw, { passive: false }); 
-canvas.addEventListener('pointerup', stopDrawing);
-canvas.addEventListener('pointerout', stopDrawing);
-canvas.addEventListener('pointercancel', stopDrawing);
+canvas.addEventListener('pointerup', stopDrawing, { passive: false });
+canvas.addEventListener('pointerout', stopDrawing, { passive: false });
+canvas.addEventListener('pointercancel', stopDrawing, { passive: false });
 
 document.getElementById('clearBtn').onclick = clearCanvas;
 
@@ -302,12 +304,12 @@ document.getElementById('saveBtn').onclick = async () => {
         btn.innerText = dict[currentLang].saving; 
         btn.disabled = true;
         
-        saveCurrentPageToArray(); // අන්තිමට ඇඳපු එකත් array එකට දාගන්නවා
+        saveCurrentPageToArray();
 
         const noteDataToSave = {
             uid: currentUser.uid, 
-            pages: notePages, // මුළු Array එකම සේව් කරනවා
-            title: noteTitleInput.value, // අලුත් Title එක සේව් කරනවා
+            pages: notePages, 
+            title: noteTitleInput.value, 
             folder: currentFolder === 'All' ? 'Personal' : currentFolder
         };
 
@@ -352,7 +354,6 @@ async function loadNotes() {
             
             if (currentFolder !== 'All' && noteFolder !== currentFolder) return;
 
-            // Thumbnail එක විදිහට පළවෙනි පිටුව පෙන්වීම
             const thumbnail = (data.pages && data.pages.length > 0) ? data.pages[0] : data.image;
             const title = data.title || dict[currentLang].untitled_note;
 
@@ -374,7 +375,6 @@ async function loadNotes() {
                 </div>
             `;
 
-            // මුළු Note Data එකම Open Canvas එකට යවනවා
             div.querySelector('img').onclick = () => openCanvas(docSnap.id, data);
             
             div.querySelector('.delete-btn').onclick = async (e) => {
