@@ -3,116 +3,101 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>SL-NOTEBOOK - Notes App</title>
+    <title>SL-NOTEBOOK - Pro</title>
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
-        /* Text Select වෙන එක සහ Screen එක Scroll වෙන එක සම්පූර්ණයෙන්ම නැවැත්වීම */
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
             background-color: #f4f7f6;
-            user-select: none; /* Select All issue fix */
+            user-select: none; 
             -webkit-user-select: none;
             -webkit-touch-callout: none;
         }
 
-        /* 1. Home Page (Notes පෙන්වන පිටුව) */
-        #homePage {
-            padding: 20px;
-            height: 100vh;
-            overflow-y: auto;
-        }
+        /* Home Page */
+        #homePage { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        
+        /* Sidebar & Content Layout */
+        .main-layout { display: flex; flex: 1; overflow: hidden; }
+        .sidebar { width: 250px; background: #fff; padding: 20px; border-right: 1px solid #ddd; overflow-y: auto; }
+        .content-area { flex: 1; padding: 20px; overflow-y: auto; }
 
-        /* 2. Drawing Page (Full Screen Canvas පිටුව) */
-        #drawingPage {
-            display: none; /* මුලින්ම මේක පෙන්නන්නේ නැහැ */
-            position: relative;
-            width: 100vw;
-            height: 100vh;
-            overflow: hidden;
-        }
+        .folder-item { cursor: pointer; padding: 10px; border-radius: 8px; transition: 0.2s; font-weight: 500; }
+        .folder-item:hover { background: #f0f0f0; }
+        .folder-item.active { background: #0d6efd; color: white; }
 
-        #drawingCanvas {
-            display: block;
-            background-color: #ffffff;
-            cursor: crosshair;
-            touch-action: none;
-        }
+        /* Drawing Page */
+        #drawingPage { display: none; position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        #drawingCanvas { display: block; background-color: #ffffff; cursor: crosshair; touch-action: none; }
 
-        /* Floating Toolbar එක (කැන්වසය උඩින් පාවෙන විදිහට) */
         .floating-toolbar {
-            position: absolute;
-            top: 15px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.85);
-            backdrop-filter: blur(15px);
-            border-radius: 50px;
-            padding: 10px 25px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            display: flex;
-            gap: 15px;
-            align-items: center;
-            z-index: 1000;
-            width: max-content;
-            max-width: 95%;
-            overflow-x: auto;
+            position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
+            background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(15px);
+            border-radius: 50px; padding: 10px 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            display: flex; gap: 15px; align-items: center; z-index: 1000;
         }
         
-        .note-card img {
-            border-radius: 12px;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.05);
-            transition: 0.3s;
-        }
-        .note-card img:hover { transform: scale(1.02); }
+        .note-card { border-radius: 12px; overflow: hidden; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
+        .note-card img { width: 100%; height: 200px; object-fit: cover; border-bottom: 1px solid #eee; cursor: pointer; }
+        .note-actions { padding: 10px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
     </style>
 </head>
 <body>
 
-<!-- පළමු පිටුව: Home Page -->
-<div id="homePage" class="container">
-    <div class="d-flex justify-content-between align-items-center mb-4 mt-3">
-        <h2 class="fw-bold text-primary">SL-NOTEBOOK</h2>
-        <button class="btn btn-primary btn-lg rounded-pill shadow" id="btnCreateNote">+ Create New Note</button>
+<!-- 1. Home Page -->
+<div id="homePage">
+    <div class="px-4 py-3 bg-white border-bottom d-flex justify-content-between align-items-center">
+        <h3 class="fw-bold text-primary m-0">SL-NOTEBOOK</h3>
+        <button class="btn btn-primary rounded-pill shadow-sm fw-bold" id="btnCreateNote">✏️ New Note</button>
     </div>
-    <hr>
-    <div class="row" id="notesGrid">
-        <!-- සේව් කරපු Notes මෙතනට වැටෙයි (Loading...) -->
-        <div class="col-12"><p class="text-muted">Loading notes...</p></div>
+
+    <div class="main-layout">
+        <!-- Sidebar (Folders) -->
+        <div class="sidebar">
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h6 class="fw-bold text-secondary text-uppercase m-0">Folders</h6>
+                <button class="btn btn-sm btn-outline-primary rounded-circle" id="btnNewFolder">+</button>
+            </div>
+            <div id="folderList">
+                <!-- Folders මෙතනට වැටෙයි -->
+            </div>
+        </div>
+
+        <!-- Notes Area -->
+        <div class="content-area">
+            <h4 class="mb-4" id="currentFolderTitle">All Notes</h4>
+            <div class="row g-4" id="notesGrid">
+                <!-- Notes මෙතනට වැටෙයි -->
+            </div>
+        </div>
     </div>
 </div>
 
-<!-- දෙවන පිටුව: Drawing Page (Full Screen) -->
+<!-- 2. Drawing Page -->
 <div id="drawingPage">
-    <!-- Floating Toolbar -->
     <div class="floating-toolbar">
         <button class="btn btn-outline-secondary rounded-pill fw-bold" id="btnBack">🔙 Back</button>
         <div class="vr mx-1"></div>
-        
-        <!-- Pen and Eraser Toggle -->
-        <div class="btn-group" role="group">
-            <button type="button" class="btn btn-dark active" id="btnPen">✒️ Pen</button>
-            <button type="button" class="btn btn-outline-dark" id="btnEraser">🧽 Eraser</button>
+        <div class="btn-group">
+            <button class="btn btn-dark active" id="btnPen">✒️ Pen</button>
+            <button class="btn btn-outline-dark" id="btnEraser">🧽 Eraser</button>
         </div>
-
         <input type="color" id="colorPicker" value="#000000" class="form-control form-control-color" style="width:40px; height:40px; padding:2px; border-radius:50%;">
-        
         <select id="brushSize" class="form-select w-auto rounded-pill">
             <option value="2">Thin</option>
             <option value="5" selected>Normal</option>
             <option value="10">Thick</option>
         </select>
-
-        <button class="btn btn-danger rounded-pill" id="clearBtn">Clear All</button>
+        <button class="btn btn-danger rounded-pill" id="clearBtn">Clear</button>
         <div class="vr mx-1"></div>
         <button class="btn btn-success rounded-pill fw-bold" id="saveBtn">Save Note</button>
     </div>
-
-    <!-- Full Screen Canvas -->
     <canvas id="drawingCanvas"></canvas>
 </div>
 
-<!-- App JS -->
+<!-- Bootstrap & App JS -->
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 <script type="module" src="app.js"></script>
 
 </body>
