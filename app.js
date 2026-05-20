@@ -204,16 +204,20 @@ function goToPrevPage() {
 document.getElementById('btnNextPage').onclick = goToNextPage;
 document.getElementById('btnPrevPage').onclick = goToPrevPage;
 
-// --- Touch Swipe Logic for Pages ---
+// --- Touch Swipe & Gesture Fix for iPad ---
 let touchStartX = 0;
+
 canvas.addEventListener('touchstart', e => {
-    if (e.touches[0] && e.touches[0].touchType !== 'stylus' && e.pointerType !== 'pen') {
+    if (e.touches[0] && e.touches[0].touchType === 'stylus') {
+        if (e.cancelable) e.preventDefault(); 
+    } 
+    else if (e.touches[0] && e.touches[0].touchType !== 'stylus') {
         touchStartX = e.touches[0].screenX;
     }
-}, {passive: true});
+}, {passive: false});
 
 canvas.addEventListener('touchend', e => {
-    if (e.changedTouches[0] && e.changedTouches[0].touchType !== 'stylus' && e.pointerType !== 'pen') {
+    if (e.changedTouches[0] && e.changedTouches[0].touchType !== 'stylus') {
         let touchEndX = e.changedTouches[0].screenX;
         if (touchEndX < touchStartX - 100) goToNextPage();
         if (touchEndX > touchStartX + 100) goToPrevPage();
@@ -240,19 +244,21 @@ function getPointerPos(e) {
     return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
 }
 
-// --- BUG FIX: Fixed iPad Pointer Drawing Logic ---
+// --- UPDATED & FIXED: Pointer Capture Drawing Logic ---
 function startDrawing(e) {
     if (e.pointerType !== 'pen') return;
     if (e.cancelable) e.preventDefault();
+    
     isDrawing = true;
+    canvas.setPointerCapture(e.pointerId); // iPad එකේ Pencil එක Canvas එකට Lock කිරීම
+    
     const pos = getPointerPos(e);
     lastX = pos.x; lastY = pos.y;
+    ctx.beginPath();
 }
 
 function draw(e) {
-    if (!isDrawing) return;
-    if (e.pointerType !== 'pen') return; 
-    
+    if (!isDrawing || e.pointerType !== 'pen') return; 
     if (e.cancelable) e.preventDefault(); 
     
     const pos = getPointerPos(e);
@@ -280,7 +286,12 @@ function draw(e) {
 function stopDrawing(e) {
     if (e.pointerType !== 'pen') return;
     if (e.cancelable) e.preventDefault();
+    
     isDrawing = false;
+    try { 
+        canvas.releasePointerCapture(e.pointerId); 
+    } catch(err) {} 
+    
     ctx.beginPath();
 }
 
@@ -296,7 +307,7 @@ const btnPen = document.getElementById('btnPen'), btnEraser = document.getElemen
 btnPen.onclick = () => { currentTool = 'pen'; btnPen.classList.replace('btn-outline-primary', 'btn-primary'); btnEraser.classList.replace('btn-primary', 'btn-outline-primary'); };
 btnEraser.onclick = () => { currentTool = 'eraser'; btnEraser.classList.replace('btn-outline-primary', 'btn-primary'); btnPen.classList.replace('btn-primary', 'btn-outline-primary'); };
 
-// --- Modified Save Logic (Array + Title) ---
+// --- Save Note ---
 document.getElementById('saveBtn').onclick = async () => {
     if(!currentUser) return;
     try {
