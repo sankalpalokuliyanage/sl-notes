@@ -35,7 +35,7 @@ function clearCanvas() {
 }
 clearCanvas();
 
-// --- අලුත් කොටස: නිවැරදි X, Y ඛණ්ඩාංක ලබාගැනීම (Scale Fix) ---
+// නිවැරදි X, Y ඛණ්ඩාංක ලබාගැනීම (Scale Fix)
 function getPointerPos(e) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
@@ -47,8 +47,11 @@ function getPointerPos(e) {
     };
 }
 
-// Drawing Logic
+// Drawing Logic - Only Apple Pencil / Stylus
 function startDrawing(e) {
+    // පෑනක් නොවේ නම් (උදා: ඇඟිල්ල නම්) ක්‍රියාකාරීත්වය නවත්වන්න
+    if (e.pointerType !== 'pen') return;
+
     isDrawing = true;
     const pos = getPointerPos(e);
     lastX = pos.x;
@@ -62,6 +65,9 @@ function draw(e) {
     if (e.cancelable) {
         e.preventDefault(); 
     }
+
+    // අඳින වෙලාවෙත් ඒක පෑනෙන්ද කියලා ආයේ චෙක් කරනවා
+    if (e.pointerType !== 'pen') return;
     
     const pos = getPointerPos(e);
     const currentX = pos.x;
@@ -76,7 +82,7 @@ function draw(e) {
     // Stylus Pressure එක අනුව මහත වෙනස් කිරීම
     let pressure = e.pressure !== undefined ? e.pressure : 1; 
     let baseWidth = parseFloat(brushSize.value);
-    ctx.lineWidth = e.pointerType === 'pen' ? baseWidth * (pressure * 2) : baseWidth;
+    ctx.lineWidth = baseWidth * (pressure * 2); 
     
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
