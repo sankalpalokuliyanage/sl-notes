@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy, doc, deleteDoc, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy, doc, deleteDoc, updateDoc, where, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -17,6 +17,35 @@ const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
 let currentUser = null;
+let currentLang = 'en'; // පෙරනිමි භාෂාව
+
+// --- Translations Dictionary (i18n) ---
+const dict = {
+    en: {
+        login_subtitle: "Keep your notes safe.", login_btn: "Sign in with Google", logout: "Logout",
+        new_note: "✏️ New Note", folders: "Folders", all_notes: "All Notes",
+        loading_notes: "Loading your notes...", no_notes: "No notes yet.",
+        btn_back: "🔙 Back", btn_pen: "✒️ Pen", btn_eraser: "🧽 Eraser", btn_clear: "Clear", btn_save: "Save Note",
+        saving: "Saving...", saved_success: "Note saved successfully!",
+        delete_confirm: "Are you sure you want to delete this note?", new_folder_prompt: "Enter new folder name:"
+    },
+    si: {
+        login_subtitle: "ඔබගේ සටහන් ආරක්ෂිතව තබාගන්න.", login_btn: "Google හරහා ඇතුල් වන්න", logout: "ඉවත් වන්න",
+        new_note: "✏️ නව සටහනක්", folders: "ගොනු (Folders)", all_notes: "සියලුම සටහන්",
+        loading_notes: "සටහන් ලබා ගනිමින්...", no_notes: "තවම සටහන් කිසිවක් නැත.",
+        btn_back: "🔙 ආපසු", btn_pen: "✒️ පෑන", btn_eraser: "🧽 මකනය", btn_clear: "මකන්න", btn_save: "සටහන සුරකින්න",
+        saving: "සුරකිමින්...", saved_success: "සටහන සාර්ථකව සුරැකුවා!",
+        delete_confirm: "මෙම සටහන මකා දැමීමට අවශ්‍ය බව විශ්වාසද?", new_folder_prompt: "නව ගොනුවේ නම ඇතුලත් කරන්න:"
+    },
+    ko: {
+        login_subtitle: "노트를 안전하게 보관하세요.", login_btn: "Google로 로그인", logout: "로그아웃",
+        new_note: "✏️ 새 노트", folders: "폴더", all_notes: "모든 노트",
+        loading_notes: "노트를 불러오는 중...", no_notes: "아직 노트가 없습니다.",
+        btn_back: "🔙 뒤로", btn_pen: "✒️ 펜", btn_eraser: "🧽 지우개", btn_clear: "지우기", btn_save: "노트 저장",
+        saving: "저장 중...", saved_success: "노트가 성공적으로 저장되었습니다!",
+        delete_confirm: "이 노트를 삭제하시겠습니까?", new_folder_prompt: "새 폴더 이름을 입력하세요:"
+    }
+};
 
 // DOM Elements
 const loginPage = document.getElementById('loginPage');
@@ -24,26 +53,71 @@ const appContainer = document.getElementById('appContainer');
 const homePage = document.getElementById('homePage');
 const drawingPage = document.getElementById('drawingPage');
 const userEmailBadge = document.getElementById('userEmailBadge');
+const languageSelect = document.getElementById('languageSelect');
+
+// --- Language Management Logic ---
+function applyLanguage(lang) {
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[lang] && dict[lang][key]) {
+            el.innerHTML = dict[lang][key];
+        }
+    });
+    
+    // Dynamic text updates
+    renderFolders();
+    if(appContainer.style.display === 'flex') loadNotes();
+}
+
+languageSelect.addEventListener('change', async (e) => {
+    currentLang = e.target.value;
+    applyLanguage(currentLang);
+    // User ලොග් වෙලා ඉන්නවා නම් අලුත් භාෂාව Database එකේ සේව් කරන්න
+    if (currentUser) {
+        await setDoc(doc(db, "users", currentUser.uid), { language: currentLang }, { merge: true });
+    }
+});
+
+async function loadUserLanguage(uid) {
+    try {
+        const userRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists() && userSnap.data().language) {
+            currentLang = userSnap.data().language;
+        } else {
+            // පළමු වතාවට ආපු කෙනෙක් නම් Default එක සේව් කරන්න
+            await setDoc(userRef, { language: 'en' }, { merge: true });
+        }
+        languageSelect.value = currentLang;
+        applyLanguage(currentLang);
+    } catch (e) {
+        console.error("Error loading language pref:", e);
+    }
+}
 
 // --- Auth Logic ---
-onAuthStateChanged(auth, (user) => {
+onAuthStateChanged(auth, async (user) => {
     if (user) {
         currentUser = user;
         userEmailBadge.innerText = user.email;
         loginPage.style.display = 'none';
         appContainer.style.display = 'flex';
+        
+        // භාෂාව සහ සටහන් Load කිරීම
+        await loadUserLanguage(user.uid);
         loadNotes();
     } else {
         currentUser = null;
         loginPage.style.display = 'flex';
         appContainer.style.display = 'none';
+        applyLanguage('en'); // ලොග් අවුට් වුනාම English වලට හැරවීම
     }
 });
 
 document.getElementById('btnLoginGoogle').onclick = () => signInWithPopup(auth, provider);
 document.getElementById('btnLogout').onclick = () => signOut(auth);
 
-// --- Theme Logic (Dark / Light) ---
+// --- Theme Logic ---
 const btnThemeToggle = document.getElementById('btnThemeToggle');
 let isDarkMode = localStorage.getItem('theme') === 'dark';
 document.documentElement.setAttribute('data-bs-theme', isDarkMode ? 'dark' : 'light');
@@ -66,20 +140,19 @@ function renderFolders() {
     folders.forEach(folder => {
         const div = document.createElement('div');
         div.className = `folder-item mb-1 ${folder === currentFolder ? 'active' : ''}`;
-        div.innerText = folder === 'All' ? '📂 All Notes' : `📁 ${folder}`;
+        div.innerText = folder === 'All' ? `📂 ${dict[currentLang].all_notes}` : `📁 ${folder}`;
         div.onclick = () => { currentFolder = folder; renderFolders(); loadNotes(); };
         list.appendChild(div);
     });
 }
 document.getElementById('btnNewFolder').onclick = () => {
-    const name = prompt("Enter new folder name:");
+    const name = prompt(dict[currentLang].new_folder_prompt);
     if (name && !folders.includes(name)) {
         folders.push(name);
         localStorage.setItem('notebook_folders', JSON.stringify(folders));
         renderFolders();
     }
 };
-renderFolders();
 
 // --- Canvas & Drawing Logic ---
 const canvas = document.getElementById('drawingCanvas');
@@ -91,7 +164,6 @@ function openCanvas(editingId = null, imageUrl = null) {
     homePage.style.display = 'none';
     drawingPage.style.display = 'block';
     resizeCanvas();
-    
     if (imageUrl) {
         const img = new Image();
         img.crossOrigin = "Anonymous";
@@ -111,7 +183,7 @@ function resizeCanvas() {
 window.addEventListener('resize', () => { if (drawingPage.style.display === 'block') resizeCanvas(); });
 
 function clearCanvas() {
-    ctx.fillStyle = "#ffffff"; // කැන්වසය හැමවිටම සුදුයි
+    ctx.fillStyle = "#ffffff"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
@@ -168,18 +240,18 @@ const btnPen = document.getElementById('btnPen'), btnEraser = document.getElemen
 btnPen.onclick = () => { currentTool = 'pen'; btnPen.classList.replace('btn-outline-primary', 'btn-primary'); btnEraser.classList.replace('btn-primary', 'btn-outline-primary'); };
 btnEraser.onclick = () => { currentTool = 'eraser'; btnEraser.classList.replace('btn-outline-primary', 'btn-primary'); btnPen.classList.replace('btn-primary', 'btn-outline-primary'); };
 
-// --- Save Note (With User ID) ---
+// --- Save Note ---
 document.getElementById('saveBtn').onclick = async () => {
     if(!currentUser) return;
     try {
         const btn = document.getElementById('saveBtn');
-        btn.innerText = "Saving..."; btn.disabled = true;
+        btn.innerText = dict[currentLang].saving; 
+        btn.disabled = true;
         const imageDataUrl = canvas.toDataURL('image/png');
 
         if (currentEditingNoteId) {
             await updateDoc(doc(db, "notes", currentEditingNoteId), { image: imageDataUrl, folder: currentFolder });
         } else {
-            // අලුතින් Save කරද්දී uid එක අනිවාර්යයෙන්ම යවනවා
             await addDoc(collection(db, "notes"), { 
                 uid: currentUser.uid, 
                 image: imageDataUrl, 
@@ -188,20 +260,21 @@ document.getElementById('saveBtn').onclick = async () => {
             });
         }
         
+        alert(dict[currentLang].saved_success);
         drawingPage.style.display = 'none'; homePage.style.display = 'flex'; loadNotes();
-        btn.innerText = "Save Note"; btn.disabled = false;
+        btn.innerText = dict[currentLang].btn_save; 
+        btn.disabled = false;
     } catch (e) { alert("Error saving."); console.error(e); }
 };
 
-// --- Load Notes (Only Current User's Notes) ---
+// --- Load Notes ---
 async function loadNotes() {
     if(!currentUser) return;
-    document.getElementById('currentFolderTitle').innerText = currentFolder === 'All' ? 'All Notes' : `Folder: ${currentFolder}`;
+    document.getElementById('currentFolderTitle').innerText = currentFolder === 'All' ? dict[currentLang].all_notes : `📁 ${currentFolder}`;
     const notesGrid = document.getElementById('notesGrid');
-    notesGrid.innerHTML = '<p class="text-muted">Loading your notes...</p>';
+    notesGrid.innerHTML = `<p class="text-muted">${dict[currentLang].loading_notes}</p>`;
     
     try {
-        // Query එකෙන් අදාල User ගේ Notes පමණක් ලබාගැනීම
         const q = query(
             collection(db, "notes"), 
             where("uid", "==", currentUser.uid),
@@ -211,7 +284,7 @@ async function loadNotes() {
         notesGrid.innerHTML = ''; 
 
         if(snapshot.empty) {
-            notesGrid.innerHTML = '<div class="col-12"><p class="text-muted">තවම සටහන් කිසිවක් නැත.</p></div>';
+            notesGrid.innerHTML = `<div class="col-12"><p class="text-muted">${dict[currentLang].no_notes}</p></div>`;
             return;
         }
 
@@ -241,7 +314,7 @@ async function loadNotes() {
             div.querySelector('img').onclick = () => openCanvas(docSnap.id, data.image);
             
             div.querySelector('.delete-btn').onclick = async (e) => {
-                if(confirm('Are you sure you want to delete this note?')) {
+                if(confirm(dict[currentLang].delete_confirm)) {
                     await deleteDoc(doc(db, "notes", e.target.getAttribute('data-id')));
                     loadNotes();
                 }
@@ -255,12 +328,6 @@ async function loadNotes() {
             notesGrid.appendChild(div);
         });
     } catch (error) {
-        // Firestore Index හැදුවෙ නැත්නම් එන Error එක පෙන්වන්න
         console.error("Error loading notes: ", error);
-        if(error.message.includes("requires an index")) {
-            notesGrid.innerHTML = `<div class="col-12"><div class="alert alert-warning">Database Index එකක් හදන්න අවශ්‍යයි. Console එකේ තියෙන ලින්ක් එක ක්ලික් කරලා ඒක හදන්න.</div></div>`;
-        } else {
-            notesGrid.innerHTML = '<div class="col-12"><p class="text-danger">Notes load කිරීමේදී දෝෂයක් මතු විය.</p></div>';
-        }
     }
 }
