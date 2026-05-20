@@ -1,4 +1,4 @@
-// Firebase SDKs Import කිරීම (CDN මගින්)
+// Firebase SDKs Import කිරීම
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
 import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 
@@ -12,11 +12,15 @@ const firebaseConfig = {
   appId: "1:154938792881:web:5d160addadce0913ff7b90"
 };
 
-// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Canvas Setup කිරීම
+// DOM Elements
+const homePage = document.getElementById('homePage');
+const drawingPage = document.getElementById('drawingPage');
+const btnCreateNote = document.getElementById('btnCreateNote');
+const btnBack = document.getElementById('btnBack');
+
 const canvas = document.getElementById('drawingCanvas');
 const ctx = canvas.getContext('2d');
 const colorPicker = document.getElementById('colorPicker');
@@ -24,33 +28,78 @@ const brushSize = document.getElementById('brushSize');
 const clearBtn = document.getElementById('clearBtn');
 const saveBtn = document.getElementById('saveBtn');
 
+const btnPen = document.getElementById('btnPen');
+const btnEraser = document.getElementById('btnEraser');
+
 let isDrawing = false;
 let lastX = 0;
 let lastY = 0;
+let currentTool = 'pen'; // 'pen' හෝ 'eraser'
 
-// Canvas එක සුදු පාටින් පිරවීම
+// --- Navigation Logic (පිටු මාරු වීම) ---
+btnCreateNote.addEventListener('click', () => {
+    homePage.style.display = 'none';
+    drawingPage.style.display = 'block';
+    resizeCanvas(); // තිරයේ ප්‍රමාණයට කැන්වසය හැඩගැන්වීම
+    clearCanvas();
+});
+
+btnBack.addEventListener('click', () => {
+    drawingPage.style.display = 'none';
+    homePage.style.display = 'block';
+    loadNotes(); // ආපසු යද්දී අලුත් Notes තියෙනවද බලන්න
+});
+
+// --- Tools Toggle (Pen / Eraser) ---
+btnPen.addEventListener('click', () => {
+    currentTool = 'pen';
+    btnPen.classList.replace('btn-outline-dark', 'btn-dark');
+    btnPen.classList.add('active');
+    btnEraser.classList.replace('btn-dark', 'btn-outline-dark');
+    btnEraser.classList.remove('active');
+});
+
+btnEraser.addEventListener('click', () => {
+    currentTool = 'eraser';
+    btnEraser.classList.replace('btn-outline-dark', 'btn-dark');
+    btnEraser.classList.add('active');
+    btnPen.classList.replace('btn-dark', 'btn-outline-dark');
+    btnPen.classList.remove('active');
+});
+
+// --- Canvas Sizing (Full Screen) ---
+function resizeCanvas() {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+    clearCanvas(); // Resize කරද්දී කැන්වසය සුදු පාටින් පිරවීම
+}
+
+// Window එක resize වෙද්දී කැන්වසයත් හැඩගැසීම
+window.addEventListener('resize', () => {
+    if (drawingPage.style.display === 'block') {
+        resizeCanvas();
+    }
+});
+
 function clearCanvas() {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
-clearCanvas();
 
-// නිවැරදි X, Y ඛණ්ඩාංක ලබාගැනීම (Scale Fix)
+// නිවැරදි X, Y ඛණ්ඩාංක
 function getPointerPos(e) {
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-
     return {
         x: (e.clientX - rect.left) * scaleX,
         y: (e.clientY - rect.top) * scaleY
     };
 }
 
-// Drawing Logic - Only Apple Pencil / Stylus
+// --- Drawing Logic ---
 function startDrawing(e) {
-    // පෑනක් නොවේ නම් (උදා: ඇඟිල්ල නම්) ක්‍රියාකාරීත්වය නවත්වන්න
-    if (e.pointerType !== 'pen') return;
+    if (e.pointerType !== 'pen') return; // Apple Pencil පමණයි
 
     isDrawing = true;
     const pos = getPointerPos(e);
@@ -61,12 +110,10 @@ function startDrawing(e) {
 function draw(e) {
     if (!isDrawing) return;
     
-    // Default scroll වීම නවත්වන්න
     if (e.cancelable) {
         e.preventDefault(); 
     }
 
-    // අඳින වෙලාවෙත් ඒක පෑනෙන්ද කියලා ආයේ චෙක් කරනවා
     if (e.pointerType !== 'pen') return;
     
     const pos = getPointerPos(e);
@@ -77,12 +124,17 @@ function draw(e) {
     ctx.moveTo(lastX, lastY);
     ctx.lineTo(currentX, currentY);
     
-    ctx.strokeStyle = colorPicker.value;
-    
-    // Stylus Pressure එක අනුව මහත වෙනස් කිරීම
     let pressure = e.pressure !== undefined ? e.pressure : 1; 
     let baseWidth = parseFloat(brushSize.value);
-    ctx.lineWidth = baseWidth * (pressure * 2); 
+
+    // Eraser එක තෝරලා නම් සුදු පාටින් මහතට අඳිනවා, නැත්නම් තෝරපු පාටින් අඳිනවා
+    if (currentTool === 'eraser') {
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = baseWidth * 6; // මකනය සාමාන්‍ය පෑනට වඩා මහතයි
+    } else {
+        ctx.strokeStyle = colorPicker.value;
+        ctx.lineWidth = baseWidth * (pressure * 2);
+    }
     
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -97,74 +149,79 @@ function stopDrawing() {
     ctx.beginPath();
 }
 
-// Event Listeners සම්බන්ධ කිරීම 
-// (passive: false දැම්මේ e.preventDefault() එක error එකක් නැතුව වැඩ කරන්නයි)
+// Event Listeners
 canvas.addEventListener('pointerdown', startDrawing);
 canvas.addEventListener('pointermove', draw, { passive: false }); 
 canvas.addEventListener('pointerup', stopDrawing);
 canvas.addEventListener('pointerout', stopDrawing);
 
-// Clear Canvas Button
 clearBtn.addEventListener('click', clearCanvas);
 
-// Firebase Firestore එකට Save කිරීම
+// --- Firebase Save ---
 saveBtn.addEventListener('click', async () => {
     try {
         saveBtn.innerText = "Saving...";
         saveBtn.disabled = true;
         
-        // Canvas එකේ තියෙන රූපය Base64 ආකෘතියට හැරවීම
         const imageDataUrl = canvas.toDataURL('image/png');
 
-        // Firestore එකේ 'notes' කියන collection එකට දත්ත යැවීම
         await addDoc(collection(db, "notes"), {
             image: imageDataUrl,
             createdAt: serverTimestamp()
         });
 
         alert("Note saved successfully!");
-        clearCanvas(); 
-        loadNotes();   
+        
+        // Save කළාට පස්සේ ආපසු Home පිටුවට යැවීම
+        drawingPage.style.display = 'none';
+        homePage.style.display = 'block';
+        loadNotes();
         
     } catch (e) {
         console.error("Error adding document: ", e);
-        alert("Error saving note. Check console for details.");
+        alert("Error saving note. Check console.");
     } finally {
         saveBtn.innerText = "Save Note";
         saveBtn.disabled = false;
     }
 });
 
-// සේව් කරපු Notes Firestore එකෙන් අරගෙන පෙන්වීම
+// --- Load Notes (Home Page එකට) ---
 async function loadNotes() {
-    const notesList = document.getElementById('notesList');
-    notesList.innerHTML = 'Loading notes...';
+    const notesGrid = document.getElementById('notesGrid');
+    notesGrid.innerHTML = '<div class="col-12"><p class="text-muted">Loading notes...</p></div>';
     
     try {
         const q = query(collection(db, "notes"), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         
-        notesList.innerHTML = ''; 
+        notesGrid.innerHTML = ''; 
         
         if(querySnapshot.empty) {
-            notesList.innerHTML = '<p class="text-muted small">තවම සටහන් කිසිවක් නැත.</p>';
+            notesGrid.innerHTML = '<div class="col-12"><p class="text-muted">තවම සටහන් කිසිවක් නැත.</p></div>';
             return;
         }
 
         querySnapshot.forEach((doc) => {
             const noteData = doc.data();
             if(noteData.image) {
+                // Notes ලස්සනට Grid එකක් විදිහට පෙන්වීම
+                const colDiv = document.createElement('div');
+                colDiv.className = 'col-md-4 col-sm-6 mb-4 note-card';
+                
                 const imgElement = document.createElement('img');
                 imgElement.src = noteData.image;
-                imgElement.className = 'img-fluid mb-3 border rounded shadow-sm w-100';
-                notesList.appendChild(imgElement);
+                imgElement.className = 'img-fluid w-100 border';
+                
+                colDiv.appendChild(imgElement);
+                notesGrid.appendChild(colDiv);
             }
         });
     } catch (error) {
         console.error("Error loading notes: ", error);
-        notesList.innerHTML = '<p class="text-danger small">Notes load කිරීමේදී දෝෂයක් මතු විය.</p>';
+        notesGrid.innerHTML = '<div class="col-12"><p class="text-danger">Notes load කිරීමේදී දෝෂයක් මතු විය.</p></div>';
     }
 }
 
-// පිටුව Load වෙද්දී කලින් තියෙන Notes පෙන්නන්න
+// පිටුව Load වෙද්දී මුලින්ම Notes ටික පෙන්නන්න
 loadNotes();
