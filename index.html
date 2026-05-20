@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="si">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SL-NOTEBOOK - Notes App</title>
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f4f7f6;
+            overflow-x: hidden;
+        }
+        #drawingCanvas {
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+            cursor: crosshair;
+            /* iPad එකේ අඳිද්දී screen එක scroll වෙන එක නවත්තන්න මේක අනිවාර්යයි */
+            touch-action: none; 
+            max-width: 100%;
+        }
+        .toolbar {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            padding: 15px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container-fluid py-3">
+    <div class="row">
+        <!-- Sidebar: මෙතන සේව් කරපු Notes පෙන්නන්න පුළුවන් -->
+        <div class="col-md-3 mb-3">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-white border-0 pt-3">
+                    <h5 class="fw-bold text-primary">මගේ සටහන් (Notes)</h5>
+                </div>
+                <div class="card-body overflow-auto" id="notesList" style="max-height: 80vh;">
+                    <!-- Firebase එකෙන් එන Notes මෙතනට වැටෙයි -->
+                    <p class="text-muted small">Loading notes...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Canvas Area -->
+        <div class="col-md-9">
+            <!-- Toolbar -->
+            <div class="toolbar mb-3 d-flex gap-3 align-items-center flex-wrap">
+                <input type="color" id="colorPicker" value="#000000" class="form-control form-control-color" title="පාට තෝරන්න">
+                
+                <select id="brushSize" class="form-select w-auto">
+                    <option value="2">සිහින් (Thin)</option>
+                    <option value="5" selected>සාමාන්‍ය (Normal)</option>
+                    <option value="10">ඝන (Thick)</option>
+                </select>
+
+                <button class="btn btn-outline-danger" id="clearBtn">මකන්න (Clear)</button>
+                <button class="btn btn-primary ms-auto" id="saveBtn">Save Note</button>
+            </div>
+
+            <!-- Canvas -->
+            <div class="canvas-container overflow-auto">
+                <canvas id="drawingCanvas" width="800" height="600"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- App JS (Module type එකක් විදිහට ලින්ක් කිරීම) -->
+<script type="module" src="app.js"></script>
+
+</body>
+</html>
