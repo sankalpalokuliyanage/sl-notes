@@ -28,27 +28,44 @@ let isDrawing = false;
 let lastX = 0;
 let lastY = 0;
 
-// Canvas එක සුදු පාටින් පිරවීම (Save කරද්දී background එක කළු නොවීමට)
+// Canvas එක සුදු පාටින් පිරවීම
 function clearCanvas() {
     ctx.fillStyle = "#ffffff";
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 clearCanvas();
 
-// Drawing Logic (Pointer Events මගින් පෑන සහ ඇඟිල්ල හඳුනාගැනීම)
+// --- අලුත් කොටස: නිවැරදි X, Y ඛණ්ඩාංක ලබාගැනීම (Scale Fix) ---
+function getPointerPos(e) {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+
+    return {
+        x: (e.clientX - rect.left) * scaleX,
+        y: (e.clientY - rect.top) * scaleY
+    };
+}
+
+// Drawing Logic
 function startDrawing(e) {
     isDrawing = true;
-    const rect = canvas.getBoundingClientRect();
-    lastX = e.clientX - rect.left;
-    lastY = e.clientY - rect.top;
+    const pos = getPointerPos(e);
+    lastX = pos.x;
+    lastY = pos.y;
 }
 
 function draw(e) {
     if (!isDrawing) return;
     
-    const rect = canvas.getBoundingClientRect();
-    const currentX = e.clientX - rect.left;
-    const currentY = e.clientY - rect.top;
+    // Default scroll වීම නවත්වන්න
+    if (e.cancelable) {
+        e.preventDefault(); 
+    }
+    
+    const pos = getPointerPos(e);
+    const currentX = pos.x;
+    const currentY = pos.y;
 
     ctx.beginPath();
     ctx.moveTo(lastX, lastY);
@@ -56,7 +73,7 @@ function draw(e) {
     
     ctx.strokeStyle = colorPicker.value;
     
-    // Apple Pencil වගේ Stylus එකකින් එන pressure එක අනුව මහත වෙනස් කිරීම
+    // Stylus Pressure එක අනුව මහත වෙනස් කිරීම
     let pressure = e.pressure !== undefined ? e.pressure : 1; 
     let baseWidth = parseFloat(brushSize.value);
     ctx.lineWidth = e.pointerType === 'pen' ? baseWidth * (pressure * 2) : baseWidth;
@@ -74,9 +91,10 @@ function stopDrawing() {
     ctx.beginPath();
 }
 
-// Event Listeners සම්බන්ධ කිරීම
+// Event Listeners සම්බන්ධ කිරීම 
+// (passive: false දැම්මේ e.preventDefault() එක error එකක් නැතුව වැඩ කරන්නයි)
 canvas.addEventListener('pointerdown', startDrawing);
-canvas.addEventListener('pointermove', draw);
+canvas.addEventListener('pointermove', draw, { passive: false }); 
 canvas.addEventListener('pointerup', stopDrawing);
 canvas.addEventListener('pointerout', stopDrawing);
 
@@ -99,8 +117,8 @@ saveBtn.addEventListener('click', async () => {
         });
 
         alert("Note saved successfully!");
-        clearCanvas(); // Canvas එක හිස් කිරීම
-        loadNotes();   // අලුත් note එක ලැයිස්තුවට ගන්න
+        clearCanvas(); 
+        loadNotes();   
         
     } catch (e) {
         console.error("Error adding document: ", e);
@@ -117,11 +135,10 @@ async function loadNotes() {
     notesList.innerHTML = 'Loading notes...';
     
     try {
-        // අලුත්ම Notes උඩින් එන විදිහට දත්ත ලබා ගැනීම
         const q = query(collection(db, "notes"), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
         
-        notesList.innerHTML = ''; // Clear loading text
+        notesList.innerHTML = ''; 
         
         if(querySnapshot.empty) {
             notesList.innerHTML = '<p class="text-muted small">තවම සටහන් කිසිවක් නැත.</p>';
