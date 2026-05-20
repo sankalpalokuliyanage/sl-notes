@@ -1,5 +1,6 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy, doc, deleteDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy, doc, deleteDoc, updateDoc, where } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyB5kkpYbcKmRvJ48YirGRUJIXtnv6OA0Lo",
@@ -12,31 +13,59 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
+const auth = getAuth(app);
+const provider = new GoogleAuthProvider();
+
+let currentUser = null;
 
 // DOM Elements
+const loginPage = document.getElementById('loginPage');
+const appContainer = document.getElementById('appContainer');
 const homePage = document.getElementById('homePage');
 const drawingPage = document.getElementById('drawingPage');
-const btnCreateNote = document.getElementById('btnCreateNote');
-const btnBack = document.getElementById('btnBack');
-const canvas = document.getElementById('drawingCanvas');
-const ctx = canvas.getContext('2d');
+const userEmailBadge = document.getElementById('userEmailBadge');
 
-let isDrawing = false;
-let lastX = 0, lastY = 0;
-let currentTool = 'pen';
-let currentEditingNoteId = null; // Edit කරන Note එකේ ID එක
-let currentFolder = 'All'; // දැනට ඉන්න Folder එක
+// --- Auth Logic ---
+onAuthStateChanged(auth, (user) => {
+    if (user) {
+        currentUser = user;
+        userEmailBadge.innerText = user.email;
+        loginPage.style.display = 'none';
+        appContainer.style.display = 'flex';
+        loadNotes();
+    } else {
+        currentUser = null;
+        loginPage.style.display = 'flex';
+        appContainer.style.display = 'none';
+    }
+});
 
-// Folders Management (Local Storage පාවිච්චි කර ඇත)
+document.getElementById('btnLoginGoogle').onclick = () => signInWithPopup(auth, provider);
+document.getElementById('btnLogout').onclick = () => signOut(auth);
+
+// --- Theme Logic (Dark / Light) ---
+const btnThemeToggle = document.getElementById('btnThemeToggle');
+let isDarkMode = localStorage.getItem('theme') === 'dark';
+document.documentElement.setAttribute('data-bs-theme', isDarkMode ? 'dark' : 'light');
+btnThemeToggle.innerText = isDarkMode ? '☀️' : '🌙';
+
+btnThemeToggle.onclick = () => {
+    isDarkMode = !isDarkMode;
+    document.documentElement.setAttribute('data-bs-theme', isDarkMode ? 'dark' : 'light');
+    localStorage.setItem('theme', isDarkMode ? 'dark' : 'light');
+    btnThemeToggle.innerText = isDarkMode ? '☀️' : '🌙';
+};
+
+// --- Folders Logic ---
 let folders = JSON.parse(localStorage.getItem('notebook_folders')) || ['All', 'Work', 'Personal'];
+let currentFolder = 'All';
 
-// --- Folders UI ---
 function renderFolders() {
     const list = document.getElementById('folderList');
     list.innerHTML = '';
     folders.forEach(folder => {
         const div = document.createElement('div');
-        div.className = `folder-item ${folder === currentFolder ? 'active' : ''}`;
+        div.className = `folder-item mb-1 ${folder === currentFolder ? 'active' : ''}`;
         div.innerText = folder === 'All' ? '📂 All Notes' : `📁 ${folder}`;
         div.onclick = () => { currentFolder = folder; renderFolders(); loadNotes(); };
         list.appendChild(div);
@@ -50,8 +79,13 @@ document.getElementById('btnNewFolder').onclick = () => {
         renderFolders();
     }
 };
+renderFolders();
 
-// --- Navigation & Canvas ---
+// --- Canvas & Drawing Logic ---
+const canvas = document.getElementById('drawingCanvas');
+const ctx = canvas.getContext('2d');
+let isDrawing = false, lastX = 0, lastY = 0, currentTool = 'pen', currentEditingNoteId = null;
+
 function openCanvas(editingId = null, imageUrl = null) {
     currentEditingNoteId = editingId;
     homePage.style.display = 'none';
@@ -59,7 +93,6 @@ function openCanvas(editingId = null, imageUrl = null) {
     resizeCanvas();
     
     if (imageUrl) {
-        // Edit කිරීම සඳහා පරණ Note එක කැන්වසයට Load කිරීම
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.onload = () => { ctx.drawImage(img, 0, 0, canvas.width, canvas.height); };
@@ -67,18 +100,18 @@ function openCanvas(editingId = null, imageUrl = null) {
     }
 }
 
-btnCreateNote.onclick = () => openCanvas(null, null);
-btnBack.onclick = () => { drawingPage.style.display = 'none'; homePage.style.display = 'block'; loadNotes(); };
+document.getElementById('btnCreateNote').onclick = () => openCanvas();
+document.getElementById('btnBack').onclick = () => { drawingPage.style.display = 'none'; homePage.style.display = 'flex'; loadNotes(); };
 
 function resizeCanvas() {
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
-    if (!currentEditingNoteId) clearCanvas(); // අලුත් එකක් නම් විතරක් සුදු කරන්න
+    if (!currentEditingNoteId) clearCanvas();
 }
 window.addEventListener('resize', () => { if (drawingPage.style.display === 'block') resizeCanvas(); });
 
 function clearCanvas() {
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = "#ffffff"; // කැන්වසය හැමවිටම සුදුයි
     ctx.fillRect(0, 0, canvas.width, canvas.height);
 }
 
@@ -87,7 +120,6 @@ function getPointerPos(e) {
     return { x: (e.clientX - rect.left) * (canvas.width / rect.width), y: (e.clientY - rect.top) * (canvas.height / rect.height) };
 }
 
-// --- BUG FIX: Drawing Logic ---
 function startDrawing(e) {
     if (e.pointerType !== 'pen') return;
     isDrawing = true;
@@ -101,9 +133,7 @@ function draw(e) {
     if (e.pointerType !== 'pen') return;
     
     const pos = getPointerPos(e);
-    ctx.beginPath();
-    ctx.moveTo(lastX, lastY);
-    ctx.lineTo(pos.x, pos.y);
+    ctx.beginPath(); ctx.moveTo(lastX, lastY); ctx.lineTo(pos.x, pos.y);
     
     let pressure = e.pressure !== undefined ? e.pressure : 1; 
     let baseWidth = parseFloat(document.getElementById('brushSize').value);
@@ -120,7 +150,6 @@ function draw(e) {
     lastX = pos.x; lastY = pos.y;
 }
 
-// FIX: අත ගෑවුනොත් නවතින එක නවත්වන්න 'pen' එකෙන් එන ඉවෙන්ට් විතරක් භාරගැනීම
 function stopDrawing(e) {
     if (e.pointerType !== 'pen') return; 
     isDrawing = false;
@@ -131,94 +160,107 @@ canvas.addEventListener('pointerdown', startDrawing);
 canvas.addEventListener('pointermove', draw, { passive: false }); 
 canvas.addEventListener('pointerup', stopDrawing);
 canvas.addEventListener('pointerout', stopDrawing);
-canvas.addEventListener('pointercancel', stopDrawing); // හදිසි බාධා වලදීත් පෑනෙන් නම් පමණක් නවතී
+canvas.addEventListener('pointercancel', stopDrawing);
 
 document.getElementById('clearBtn').onclick = clearCanvas;
 
-// Tools toggle
 const btnPen = document.getElementById('btnPen'), btnEraser = document.getElementById('btnEraser');
-btnPen.onclick = () => { currentTool = 'pen'; btnPen.classList.add('active', 'btn-dark'); btnPen.classList.remove('btn-outline-dark'); btnEraser.classList.remove('active', 'btn-dark'); btnEraser.classList.add('btn-outline-dark'); };
-btnEraser.onclick = () => { currentTool = 'eraser'; btnEraser.classList.add('active', 'btn-dark'); btnEraser.classList.remove('btn-outline-dark'); btnPen.classList.remove('active', 'btn-dark'); btnPen.classList.add('btn-outline-dark'); };
+btnPen.onclick = () => { currentTool = 'pen'; btnPen.classList.replace('btn-outline-primary', 'btn-primary'); btnEraser.classList.replace('btn-primary', 'btn-outline-primary'); };
+btnEraser.onclick = () => { currentTool = 'eraser'; btnEraser.classList.replace('btn-outline-primary', 'btn-primary'); btnPen.classList.replace('btn-primary', 'btn-outline-primary'); };
 
-
-// --- Save & Update Logic ---
+// --- Save Note (With User ID) ---
 document.getElementById('saveBtn').onclick = async () => {
+    if(!currentUser) return;
     try {
         const btn = document.getElementById('saveBtn');
         btn.innerText = "Saving..."; btn.disabled = true;
         const imageDataUrl = canvas.toDataURL('image/png');
 
         if (currentEditingNoteId) {
-            // පරණ එක Edit කරනවා නම් (Update)
             await updateDoc(doc(db, "notes", currentEditingNoteId), { image: imageDataUrl, folder: currentFolder });
         } else {
-            // අලුත් එකක් Save කරනවා නම් (Add)
-            await addDoc(collection(db, "notes"), { image: imageDataUrl, folder: currentFolder === 'All' ? 'Personal' : currentFolder, createdAt: serverTimestamp() });
+            // අලුතින් Save කරද්දී uid එක අනිවාර්යයෙන්ම යවනවා
+            await addDoc(collection(db, "notes"), { 
+                uid: currentUser.uid, 
+                image: imageDataUrl, 
+                folder: currentFolder === 'All' ? 'Personal' : currentFolder, 
+                createdAt: serverTimestamp() 
+            });
         }
         
-        drawingPage.style.display = 'none'; homePage.style.display = 'block'; loadNotes();
+        drawingPage.style.display = 'none'; homePage.style.display = 'flex'; loadNotes();
         btn.innerText = "Save Note"; btn.disabled = false;
-    } catch (e) { alert("Error saving."); }
+    } catch (e) { alert("Error saving."); console.error(e); }
 };
 
-
-// --- Load & Render Notes ---
+// --- Load Notes (Only Current User's Notes) ---
 async function loadNotes() {
+    if(!currentUser) return;
     document.getElementById('currentFolderTitle').innerText = currentFolder === 'All' ? 'All Notes' : `Folder: ${currentFolder}`;
     const notesGrid = document.getElementById('notesGrid');
-    notesGrid.innerHTML = '<p>Loading notes...</p>';
+    notesGrid.innerHTML = '<p class="text-muted">Loading your notes...</p>';
     
-    const q = query(collection(db, "notes"), orderBy("createdAt", "desc"));
-    const snapshot = await getDocs(q);
-    notesGrid.innerHTML = ''; 
+    try {
+        // Query එකෙන් අදාල User ගේ Notes පමණක් ලබාගැනීම
+        const q = query(
+            collection(db, "notes"), 
+            where("uid", "==", currentUser.uid),
+            orderBy("createdAt", "desc")
+        );
+        const snapshot = await getDocs(q);
+        notesGrid.innerHTML = ''; 
 
-    snapshot.forEach((docSnap) => {
-        const data = docSnap.data();
-        const noteFolder = data.folder || 'Personal';
-        
-        // Filter by current folder
-        if (currentFolder !== 'All' && noteFolder !== currentFolder) return;
+        if(snapshot.empty) {
+            notesGrid.innerHTML = '<div class="col-12"><p class="text-muted">තවම සටහන් කිසිවක් නැත.</p></div>';
+            return;
+        }
 
-        // Note Card UI නිර්මාණය
-        const div = document.createElement('div');
-        div.className = 'col-md-4 col-sm-6';
-        
-        // Folder මාරු කිරීමේ Dropdown options හැදීම
-        let folderOptions = folders.filter(f => f !== 'All').map(f => `<option value="${f}" ${f === noteFolder ? 'selected' : ''}>${f}</option>`).join('');
+        snapshot.forEach((docSnap) => {
+            const data = docSnap.data();
+            const noteFolder = data.folder || 'Personal';
+            
+            if (currentFolder !== 'All' && noteFolder !== currentFolder) return;
 
-        div.innerHTML = `
-            <div class="note-card">
-                <img src="${data.image}" title="Click to Edit">
-                <div class="note-actions bg-light">
-                    <select class="form-select form-select-sm w-auto move-folder-select" data-id="${docSnap.id}">
-                        ${folderOptions}
-                    </select>
-                    <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${docSnap.id}">🗑️</button>
+            const div = document.createElement('div');
+            div.className = 'col-lg-3 col-md-4 col-sm-6';
+            
+            let folderOptions = folders.filter(f => f !== 'All').map(f => `<option value="${f}" ${f === noteFolder ? 'selected' : ''}>${f}</option>`).join('');
+
+            div.innerHTML = `
+                <div class="note-card bg-body-tertiary">
+                    <img src="${data.image}" title="Click to Edit">
+                    <div class="note-actions">
+                        <select class="form-select form-select-sm w-auto move-folder-select" data-id="${docSnap.id}">
+                            ${folderOptions}
+                        </select>
+                        <button class="btn btn-sm btn-outline-danger delete-btn" data-id="${docSnap.id}">🗑️</button>
+                    </div>
                 </div>
-            </div>
-        `;
+            `;
 
-        // Edit කිරීම සඳහා Image එක Click කිරීම
-        div.querySelector('img').onclick = () => openCanvas(docSnap.id, data.image);
-        
-        // Delete Button Logic
-        div.querySelector('.delete-btn').onclick = async (e) => {
-            if(confirm('Are you sure you want to delete this note?')) {
-                await deleteDoc(doc(db, "notes", e.target.getAttribute('data-id')));
+            div.querySelector('img').onclick = () => openCanvas(docSnap.id, data.image);
+            
+            div.querySelector('.delete-btn').onclick = async (e) => {
+                if(confirm('Are you sure you want to delete this note?')) {
+                    await deleteDoc(doc(db, "notes", e.target.getAttribute('data-id')));
+                    loadNotes();
+                }
+            };
+
+            div.querySelector('.move-folder-select').onchange = async (e) => {
+                await updateDoc(doc(db, "notes", e.target.getAttribute('data-id')), { folder: e.target.value });
                 loadNotes();
-            }
-        };
+            };
 
-        // Folder Move Logic
-        div.querySelector('.move-folder-select').onchange = async (e) => {
-            await updateDoc(doc(db, "notes", e.target.getAttribute('data-id')), { folder: e.target.value });
-            loadNotes();
-        };
-
-        notesGrid.appendChild(div);
-    });
+            notesGrid.appendChild(div);
+        });
+    } catch (error) {
+        // Firestore Index හැදුවෙ නැත්නම් එන Error එක පෙන්වන්න
+        console.error("Error loading notes: ", error);
+        if(error.message.includes("requires an index")) {
+            notesGrid.innerHTML = `<div class="col-12"><div class="alert alert-warning">Database Index එකක් හදන්න අවශ්‍යයි. Console එකේ තියෙන ලින්ක් එක ක්ලික් කරලා ඒක හදන්න.</div></div>`;
+        } else {
+            notesGrid.innerHTML = '<div class="col-12"><p class="text-danger">Notes load කිරීමේදී දෝෂයක් මතු විය.</p></div>';
+        }
+    }
 }
-
-// Initial Setup
-renderFolders();
-loadNotes();

@@ -1,103 +1,146 @@
 <!DOCTYPE html>
-<html lang="si">
+<html lang="en" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>SL-NOTEBOOK - Pro</title>
     <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
         body, html {
             margin: 0; padding: 0; width: 100%; height: 100%;
-            background-color: #f4f7f6;
             user-select: none; 
             -webkit-user-select: none;
             -webkit-touch-callout: none;
+            transition: background-color 0.3s;
         }
 
-        /* Home Page */
-        #homePage { height: 100vh; overflow: hidden; display: flex; flex-direction: column; }
+        /* --- Login Page --- */
+        #loginPage {
+            height: 100vh; display: flex; flex-direction: column;
+            justify-content: center; align-items: center; z-index: 2000;
+        }
+
+        /* --- Main App Layout --- */
+        #appContainer { display: none; height: 100vh; flex-direction: column; }
         
-        /* Sidebar & Content Layout */
+        #homePage { display: flex; flex: 1; overflow: hidden; flex-direction: column; }
         .main-layout { display: flex; flex: 1; overflow: hidden; }
-        .sidebar { width: 250px; background: #fff; padding: 20px; border-right: 1px solid #ddd; overflow-y: auto; }
+        
+        .sidebar { width: 250px; padding: 20px; border-right: 1px solid var(--bs-border-color); overflow-y: auto; }
         .content-area { flex: 1; padding: 20px; overflow-y: auto; }
 
         .folder-item { cursor: pointer; padding: 10px; border-radius: 8px; transition: 0.2s; font-weight: 500; }
-        .folder-item:hover { background: #f0f0f0; }
+        .folder-item:hover { background: var(--bs-tertiary-bg); }
         .folder-item.active { background: #0d6efd; color: white; }
 
-        /* Drawing Page */
+        /* --- Drawing Page --- */
         #drawingPage { display: none; position: relative; width: 100vw; height: 100vh; overflow: hidden; }
+        
+        /* Canvas එක හැමවිටම සුදු පාටින් තබා ගැනීම (කොළයක් මෙන්) */
         #drawingCanvas { display: block; background-color: #ffffff; cursor: crosshair; touch-action: none; }
 
+        /* Glassmorphism Toolbar */
         .floating-toolbar {
             position: absolute; top: 15px; left: 50%; transform: translateX(-50%);
-            background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(15px);
-            border-radius: 50px; padding: 10px 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.1);
-            display: flex; gap: 15px; align-items: center; z-index: 1000;
+            background: rgba(255, 255, 255, 0.6); backdrop-filter: blur(15px);
+            border-radius: 50px; padding: 10px 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            display: flex; gap: 15px; align-items: center; z-index: 1000; border: 1px solid rgba(255,255,255,0.3);
         }
         
-        .note-card { border-radius: 12px; overflow: hidden; background: white; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-        .note-card img { width: 100%; height: 200px; object-fit: cover; border-bottom: 1px solid #eee; cursor: pointer; }
-        .note-actions { padding: 10px; display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: space-between; }
+        /* Dark Mode Toolbar Fix */
+        [data-bs-theme="dark"] .floating-toolbar {
+            background: rgba(33, 37, 41, 0.7); border: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .note-card { border-radius: 12px; overflow: hidden; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
+        .note-card img { width: 100%; height: 200px; object-fit: cover; border-bottom: 1px solid var(--bs-border-color); cursor: pointer; background: white; }
+        .note-actions { padding: 10px; display: flex; gap: 10px; align-items: center; justify-content: space-between; }
+
+        /* --- Branding Footer --- */
+        .brand-footer {
+            position: fixed; bottom: 10px; right: 15px;
+            font-size: 0.75rem; font-weight: bold; opacity: 0.6; pointer-events: none; z-index: 9999;
+        }
     </style>
 </head>
 <body>
 
-<!-- 1. Home Page -->
-<div id="homePage">
-    <div class="px-4 py-3 bg-white border-bottom d-flex justify-content-between align-items-center">
-        <h3 class="fw-bold text-primary m-0">SL-NOTEBOOK</h3>
-        <button class="btn btn-primary rounded-pill shadow-sm fw-bold" id="btnCreateNote">✏️ New Note</button>
-    </div>
-
-    <div class="main-layout">
-        <!-- Sidebar (Folders) -->
-        <div class="sidebar">
-            <div class="d-flex justify-content-between align-items-center mb-3">
-                <h6 class="fw-bold text-secondary text-uppercase m-0">Folders</h6>
-                <button class="btn btn-sm btn-outline-primary rounded-circle" id="btnNewFolder">+</button>
-            </div>
-            <div id="folderList">
-                <!-- Folders මෙතනට වැටෙයි -->
-            </div>
-        </div>
-
-        <!-- Notes Area -->
-        <div class="content-area">
-            <h4 class="mb-4" id="currentFolderTitle">All Notes</h4>
-            <div class="row g-4" id="notesGrid">
-                <!-- Notes මෙතනට වැටෙයි -->
-            </div>
-        </div>
+<!-- 0. Login Page -->
+<div id="loginPage" class="bg-body-tertiary">
+    <div class="card shadow-lg border-0 p-5 text-center" style="max-width: 400px; border-radius: 20px;">
+        <h2 class="fw-bold text-primary mb-3">SL-NOTEBOOK</h2>
+        <p class="text-muted mb-4">ඔබගේ සටහන් ආරක්ෂිතව තබාගන්න.</p>
+        <button class="btn btn-dark btn-lg rounded-pill" id="btnLoginGoogle">
+            Sign in with Google
+        </button>
     </div>
 </div>
 
-<!-- 2. Drawing Page -->
-<div id="drawingPage">
-    <div class="floating-toolbar">
-        <button class="btn btn-outline-secondary rounded-pill fw-bold" id="btnBack">🔙 Back</button>
-        <div class="vr mx-1"></div>
-        <div class="btn-group">
-            <button class="btn btn-dark active" id="btnPen">✒️ Pen</button>
-            <button class="btn btn-outline-dark" id="btnEraser">🧽 Eraser</button>
+<!-- 1. Main App Container -->
+<div id="appContainer">
+    
+    <!-- Header -->
+    <div class="px-4 py-3 border-bottom d-flex justify-content-between align-items-center bg-body">
+        <div class="d-flex align-items-center gap-3">
+            <h3 class="fw-bold text-primary m-0">SL-NOTEBOOK</h3>
+            <span class="badge bg-secondary" id="userEmailBadge">user@gmail.com</span>
         </div>
-        <input type="color" id="colorPicker" value="#000000" class="form-control form-control-color" style="width:40px; height:40px; padding:2px; border-radius:50%;">
-        <select id="brushSize" class="form-select w-auto rounded-pill">
-            <option value="2">Thin</option>
-            <option value="5" selected>Normal</option>
-            <option value="10">Thick</option>
-        </select>
-        <button class="btn btn-danger rounded-pill" id="clearBtn">Clear</button>
-        <div class="vr mx-1"></div>
-        <button class="btn btn-success rounded-pill fw-bold" id="saveBtn">Save Note</button>
+        <div class="d-flex gap-3 align-items-center">
+            <button class="btn btn-outline-secondary rounded-circle" id="btnThemeToggle" title="Toggle Dark/Light Mode">🌙</button>
+            <button class="btn btn-outline-danger btn-sm rounded-pill" id="btnLogout">Logout</button>
+            <button class="btn btn-primary rounded-pill shadow-sm fw-bold" id="btnCreateNote">✏️ New Note</button>
+        </div>
     </div>
-    <canvas id="drawingCanvas"></canvas>
+
+    <!-- Home Page Layout -->
+    <div id="homePage">
+        <div class="main-layout">
+            <!-- Sidebar -->
+            <div class="sidebar bg-body-tertiary">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h6 class="fw-bold text-secondary text-uppercase m-0">Folders</h6>
+                    <button class="btn btn-sm btn-primary rounded-circle" id="btnNewFolder">+</button>
+                </div>
+                <div id="folderList"></div>
+            </div>
+
+            <!-- Notes Area -->
+            <div class="content-area bg-body">
+                <h4 class="mb-4 fw-bold" id="currentFolderTitle">All Notes</h4>
+                <div class="row g-4" id="notesGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Drawing Page -->
+    <div id="drawingPage">
+        <div class="floating-toolbar">
+            <button class="btn btn-secondary rounded-pill fw-bold" id="btnBack">🔙 Back</button>
+            <div class="vr mx-1"></div>
+            <div class="btn-group">
+                <button class="btn btn-primary active" id="btnPen">✒️ Pen</button>
+                <button class="btn btn-outline-primary" id="btnEraser">🧽 Eraser</button>
+            </div>
+            <input type="color" id="colorPicker" value="#000000" class="form-control form-control-color" style="width:40px; height:40px; padding:2px; border-radius:50%;">
+            <select id="brushSize" class="form-select w-auto rounded-pill bg-body text-body">
+                <option value="2">Thin</option>
+                <option value="5" selected>Normal</option>
+                <option value="10">Thick</option>
+            </select>
+            <button class="btn btn-danger rounded-pill" id="clearBtn">Clear</button>
+            <div class="vr mx-1"></div>
+            <button class="btn btn-success rounded-pill fw-bold" id="saveBtn">Save Note</button>
+        </div>
+        <canvas id="drawingCanvas"></canvas>
+    </div>
 </div>
+
+<!-- Footer Branding -->
+<div class="brand-footer text-body">Developed by Sankalpa Lokuliyanage</div>
 
 <!-- Bootstrap & App JS -->
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
 <script type="module" src="app.js"></script>
 
 </body>
