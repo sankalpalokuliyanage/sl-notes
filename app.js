@@ -16,7 +16,7 @@ const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
 
-// --- අලුත්: Offline Storage (IndexedDB Persistence) සක්‍රීය කිරීම ---
+// Offline Storage (IndexedDB Persistence) සක්‍රීය කිරීම
 enableIndexedDbPersistence(db).catch((err) => {
     if (err.code == 'failed-precondition') {
         console.warn("Offline persistence failed: Multiple tabs open.");
@@ -68,7 +68,7 @@ const noteTitleInput = document.getElementById('noteTitleInput');
 const pageIndicator = document.getElementById('pageIndicator');
 const networkStatusBadge = document.getElementById('networkStatusBadge');
 
-// --- අලුත්: Internet සම්බන්ධතාවය නිරීක්ෂණය කර Badge එක වෙනස් කිරීම ---
+// Internet සම්බන්ධතාවය නිරීක්ෂණය කර Badge එක වෙනස් කිරීම
 function updateNetworkStatus() {
     if (navigator.onLine) {
         networkStatusBadge.innerText = "Online";
@@ -157,7 +157,7 @@ let isDrawing = false, lastX = 0, lastY = 0, currentTool = 'pen', currentEditing
 let notePages = []; 
 let currentPageIndex = 0; 
 
-// --- Undo & Redo Stacks (පිටුවෙන් පිටුවට වෙන් වෙන්ව මතක තබා ගැනීමට) ---
+// --- Undo & Redo Stacks ---
 let undoHistory = [];
 let redoHistory = [];
 
@@ -407,7 +407,7 @@ document.getElementById('btnRedo').onclick = () => {
     img.src = nextState;
 };
 
-// --- Save Note ---
+// --- FIX: සේව් කළ පසු පිටුව මාරු නොවන ලොජික් එක ---
 document.getElementById('saveBtn').onclick = async () => {
     if(!currentUser) return;
     try {
@@ -428,11 +428,13 @@ document.getElementById('saveBtn').onclick = async () => {
             await updateDoc(doc(db, "notes", currentEditingNoteId), noteDataToSave);
         } else {
             noteDataToSave.createdAt = serverTimestamp();
-            await addDoc(collection(db, "notes"), noteDataToSave);
+            const docRef = await addDoc(collection(db, "notes"), noteDataToSave);
+            // අලුතින් සාදන ලද Note එකේ ID එක මෙහි තබා ගැනීමෙන් ආපසු Edit කරන විට අලුත් ඒවා සෑදීම වැලකේ.
+            currentEditingNoteId = docRef.id; 
         }
         
         alert(dict[currentLang].saved_success);
-        drawingPage.style.display = 'none'; homePage.style.display = 'flex'; loadNotes();
+        // මෙතන තිබුණු පිටුව වහලා home එකට යන කේත පේළිය මම ඉවත් කළා.
         btn.innerText = dict[currentLang].btn_save; 
         btn.disabled = false;
     } catch (e) { alert("Error saving."); console.error(e); }
