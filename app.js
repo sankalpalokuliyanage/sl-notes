@@ -24,25 +24,28 @@ const dict = {
         login_subtitle: "Keep your notes safe.", login_btn: "Sign in with Google", logout: "Logout",
         new_note: "✏️ New Note", folders: "Folders", all_notes: "All Notes",
         loading_notes: "Loading your notes...", no_notes: "No notes yet.",
-        btn_back: "🔙 Back", btn_pen: "✒️ Pen", btn_highlighter: "🖍️ Highlighter", btn_eraser: "🧽 Eraser", btn_clear: "Clear",
+        btn_back: "🔙 Back", btn_pen: "✒️ Pen", btn_highlighter: "🖍️ Highlighter", btn_eraser: "🧽 Eraser", btn_clear: "Clear", btn_save: "Save Note",
+        saving: "Saving...", saved_success: "Note saved successfully!",
         delete_confirm: "Are you sure you want to delete this note?", new_folder_prompt: "Enter new folder name:",
-        untitled_note: "Untitled Note", saving: "Saving...", saved: "☁️ Saved"
+        untitled_note: "Untitled Note"
     },
     si: {
         login_subtitle: "ඔබගේ සටහන් ආරක්ෂිතව තබාගන්න.", login_btn: "Google හරහා ඇතුල් වන්න", logout: "ඉවත් වන්න",
         new_note: "✏️ නව සටහනක්", folders: "ගොනු (Folders)", all_notes: "සියලුම සටහන්",
         loading_notes: "සටහන් ලබා ගනිමින්...", no_notes: "තවම සටහන් කිසිවක් නැත.",
-        btn_back: "🔙 ආපසු", btn_pen: "✒️ පෑන", btn_highlighter: "🖍️ හයිලයිටර්", btn_eraser: "🧽 මකනය", btn_clear: "මකන්න",
+        btn_back: "🔙 ආපසු", btn_pen: "✒️ පෑන", btn_highlighter: "🖍️ හයිලයිටර්", btn_eraser: "🧽 මකනය", btn_clear: "මකන්න", btn_save: "සටහන සුරකින්න",
+        saving: "සුරකිමින්...", saved_success: "සටහන සාර්ථකව සුරැකුවා!",
         delete_confirm: "මෙම සටහන මකා දැමීමට අවශ්‍ය බව විශ්වාසද?", new_folder_prompt: "නව ගොනුවේ නම ඇතුලත් කරන්න:",
-        untitled_note: "නමක් නැති සටහන", saving: "සුරකිමින්...", saved: "☁️ සුරැකුණා"
+        untitled_note: "නමක් නැති සටහන"
     },
     ko: {
         login_subtitle: "노트를 안전하게 보관하세요.", login_btn: "Google로 로그인", logout: "로그아웃",
         new_note: "✏️ 새 노트", folders: "폴더", all_notes: "모든 노트",
         loading_notes: "노트를 불러오는 중...", no_notes: "아직 노트가 없습니다.",
-        btn_back: "🔙 뒤로", btn_pen: "✒️ 펜", btn_highlighter: "🖍️ 형광펜", btn_eraser: "🧽 지우개", btn_clear: "지우기",
+        btn_back: "🔙 뒤로", btn_pen: "✒️ 펜", btn_highlighter: "🖍️ 형광펜", btn_eraser: "🧽 지우개", btn_clear: "지우기", btn_save: "노트 저장",
+        saving: "저장 중...", saved_success: "노트가 성공적으로 저장되었습니다!",
         delete_confirm: "이 노트를 삭제하시겠습니까?", new_folder_prompt: "새 폴더 이름을 입력하세요:",
-        untitled_note: "제목 없는 노트", saving: "저장 중...", saved: "☁️ 저장됨"
+        untitled_note: "제목 없는 노트"
     }
 };
 
@@ -54,7 +57,6 @@ const userEmailBadge = document.getElementById('userEmailBadge');
 const languageSelect = document.getElementById('languageSelect');
 const noteTitleInput = document.getElementById('noteTitleInput');
 const pageIndicator = document.getElementById('pageIndicator');
-const autoSaveIndicator = document.getElementById('autoSaveIndicator');
 
 function applyLanguage(lang) {
     document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -131,13 +133,14 @@ let isDrawing = false, lastX = 0, lastY = 0, currentTool = 'pen', currentEditing
 let notePages = []; 
 let currentPageIndex = 0; 
 
-// --- Undo & Redo Stacks ---
+// --- Undo & Redo Stacks (පිටුවෙන් පිටුවට වෙන් වෙන්ව මතක තබා ගැනීමට) ---
 let undoHistory = [];
 let redoHistory = [];
 
 function saveState() {
+    // වත්මන් පිටුවේ තත්ත්වය Undo ලිස්ට් එකට එකතු කිරීම
     undoHistory.push(canvas.toDataURL('image/png'));
-    redoHistory = []; 
+    redoHistory = []; // අලුතින් ඇන්දොත් redo හිස් වේ
 }
 
 function openCanvas(editingId = null, noteData = null) {
@@ -165,12 +168,13 @@ function openCanvas(editingId = null, noteData = null) {
 }
 
 function renderCurrentPage() {
-    clearCanvasWithoutHistory(); // ඉතිහාසය නැති නොවී පිටුව පිරිසිදු කිරීම
+    clearCanvas();
     if (notePages[currentPageIndex]) {
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.onload = () => { 
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height); 
+            // පරණ ඉතිහාසය හිස් කර වත්මන් රූපය මුල් අවස්ථාව ලෙස තැබීම
             undoHistory = [];
             redoHistory = [];
         };
@@ -180,7 +184,6 @@ function renderCurrentPage() {
         redoHistory = [];
     }
     updatePageIndicator();
-    autoSaveIndicator.innerText = dict[currentLang].saved;
 }
 
 function updatePageIndicator() {
@@ -202,7 +205,6 @@ function goToNextPage() {
     canvas.classList.add('page-turn-next');
     
     setTimeout(() => { renderCurrentPage(); }, 300); 
-    autoSaveNoteInBackground(); // පිටුව මාරු වෙද්දී පසුබිමෙන් සේව් කිරීම
 }
 
 function goToPrevPage() {
@@ -215,7 +217,6 @@ function goToPrevPage() {
     canvas.classList.add('page-turn-prev');
     
     setTimeout(() => { renderCurrentPage(); }, 300);
-    autoSaveNoteInBackground(); // පිටුව මාරು වෙද්දී පසුබිමෙන් සේව් කිරීම
 }
 
 document.getElementById('btnNextPage').onclick = goToNextPage;
@@ -251,15 +252,11 @@ function resizeCanvas() {
 }
 window.addEventListener('resize', () => { if (drawingPage.style.display === 'block') resizeCanvas(); });
 
-function clearCanvasWithoutHistory() {
+function clearCanvas() {
     ctx.fillStyle = "#ffffff"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-}
-
-function clearCanvas() {
-    clearCanvasWithoutHistory();
+    // Clear කරන එකත් Undo කරන්න පුළුවන් විදිහට ඉතිහාසයට එකතු කිරීම
     saveState();
-    autoSaveNoteInBackground(); // Clear කල පසුත් ඔටෝ සේව් කිරීම
 }
 
 function getPointerPos(e) {
@@ -272,7 +269,9 @@ function startDrawing(e) {
     if (e.pointerType !== 'pen') return;
     if (e.cancelable) e.preventDefault();
     
+    // අලුතින් ඇඳීම ඇරඹීමට පෙර වත්මන් තත්ත්වය සුරැකීම
     saveState();
+    
     isDrawing = true;
     canvas.setPointerCapture(e.pointerId); 
     
@@ -293,6 +292,7 @@ function draw(e) {
     let pressure = e.pressure !== undefined ? e.pressure : 1; 
     let baseWidth = parseFloat(document.getElementById('brushSize').value);
 
+    // Context Configurations මුලින්ම Reset කිරීම (Highlighter එක නිසා වෙනස් විය හැකි බැවින්)
     ctx.globalAlpha = 1.0;
 
     if (currentTool === 'eraser') {
@@ -300,8 +300,8 @@ function draw(e) {
         ctx.lineWidth = baseWidth * 6;
     } else if (currentTool === 'highlighter') {
         ctx.strokeStyle = document.getElementById('colorPicker').value;
-        ctx.globalAlpha = 0.4; 
-        ctx.lineWidth = baseWidth * 4; 
+        ctx.globalAlpha = 0.4; // 40% Transparent (පාරදෘශ්‍ය බව)
+        ctx.lineWidth = baseWidth * 4; // Highlighter එක පෑනට වඩා මහතයි
     } else {
         ctx.strokeStyle = document.getElementById('colorPicker').value;
         ctx.lineWidth = baseWidth * (pressure * 2); 
@@ -323,10 +323,8 @@ function stopDrawing(e) {
     } catch(err) {} 
     
     ctx.beginPath();
+    // Highlighter එක භාවිතයෙන් පසු මුළු කැන්වසයේම Alpha අගය නැවත 1.0 කිරීම
     ctx.globalAlpha = 1.0;
-
-    // පෑන ඉස්සූ සැණින් පසුබිමෙන් ඔටෝ සේව් වීම ඇරඹේ!
-    autoSaveNoteInBackground();
 }
 
 canvas.addEventListener('pointerdown', startDrawing, { passive: false });
@@ -337,11 +335,7 @@ canvas.addEventListener('pointercancel', stopDrawing, { passive: false });
 
 document.getElementById('clearBtn').onclick = clearCanvas;
 
-// Title එක වෙනස් කරන කොටත් ඔටෝ සේව් වීම
-noteTitleInput.addEventListener('input', () => {
-    autoSaveNoteInBackground();
-});
-
+// --- Tools Management (Pen, Highlighter, Eraser) ---
 const btnPen = document.getElementById('btnPen');
 const btnHighlighter = document.getElementById('btnHighlighter');
 const btnEraser = document.getElementById('btnEraser');
@@ -352,48 +346,67 @@ function resetToolButtons() {
     btnEraser.classList.replace('btn-primary', 'btn-outline-primary');
 }
 
-btnPen.onclick = () => { currentTool = 'pen'; resetToolButtons(); btnPen.classList.replace('btn-outline-primary', 'btn-primary'); };
-btnHighlighter.onclick = () => { currentTool = 'highlighter'; resetToolButtons(); btnHighlighter.classList.replace('btn-outline-primary', 'btn-primary'); };
-btnEraser.onclick = () => { currentTool = 'eraser'; resetToolButtons(); btnEraser.classList.replace('btn-outline-primary', 'btn-primary'); };
+btnPen.onclick = () => { 
+    currentTool = 'pen'; 
+    resetToolButtons();
+    btnPen.classList.replace('btn-outline-primary', 'btn-primary'); 
+};
+btnHighlighter.onclick = () => { 
+    currentTool = 'highlighter'; 
+    resetToolButtons();
+    btnHighlighter.classList.replace('btn-outline-primary', 'btn-primary'); 
+};
+btnEraser.onclick = () => { 
+    currentTool = 'eraser'; 
+    resetToolButtons();
+    btnEraser.classList.replace('btn-outline-primary', 'btn-primary'); 
+};
 
 // --- Undo & Redo Actions Logic ---
 document.getElementById('btnUndo').onclick = () => {
     if (undoHistory.length === 0) return;
+    
+    // වත්මන් තත්ත්වය Redo වෙත යැවීම
     redoHistory.push(canvas.toDataURL('image/png'));
+    
+    // පරණ තත්ත්වය ගෙන Canvas එකට ඇඳීම
     let previousState = undoHistory.pop();
     let img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => {
-        clearCanvasWithoutHistory();
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        autoSaveNoteInBackground(); // Undo කල පසුත් ඔටෝ සේව් වීම
     };
     img.src = previousState;
 };
 
 document.getElementById('btnRedo').onclick = () => {
     if (redoHistory.length === 0) return;
+    
+    // වත්මන් තත්ත්වය Undo වෙත යැවීම
     undoHistory.push(canvas.toDataURL('image/png'));
+    
     let nextState = redoHistory.pop();
     let img = new Image();
     img.crossOrigin = "Anonymous";
     img.onload = () => {
-        clearCanvasWithoutHistory();
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-        autoSaveNoteInBackground(); // Redo කල පසුත් ඔටෝ සේව් වීම
     };
     img.src = nextState;
 };
 
-// ==========================================
-// NEW FEATURE: Background Auto-Save Logic (No Alert, No Navigation)
-// ==========================================
-async function autoSaveNoteInBackground() {
+// --- Save Note ---
+document.getElementById('saveBtn').onclick = async () => {
     if(!currentUser) return;
     try {
-        autoSaveIndicator.innerText = dict[currentLang].saving;
+        const btn = document.getElementById('saveBtn');
+        btn.innerText = dict[currentLang].saving; 
+        btn.disabled = true;
         
-        saveCurrentPageToArray(); // වත්මන් පිටුව array එකට යාවත්කාලීන කිරීම
+        saveCurrentPageToArray();
 
         const noteDataToSave = {
             uid: currentUser.uid, 
@@ -403,21 +416,18 @@ async function autoSaveNoteInBackground() {
         };
 
         if (currentEditingNoteId) {
-            // පරණ එකක් නම් කෙලින්ම Update වේ
             await updateDoc(doc(db, "notes", currentEditingNoteId), noteDataToSave);
         } else {
-            // අලුත් එකක් නම් මුලින්ම සේව් වී, ලැබෙන අලුත් Document ID එක මතක තබා ගනී (නැතහොත් හැම පෑන ඉස්සීමේදීම අලුත් ඒවා සෑදේ)
             noteDataToSave.createdAt = serverTimestamp();
-            const docRef = await addDoc(collection(db, "notes"), noteDataToSave);
-            currentEditingNoteId = docRef.id; 
+            await addDoc(collection(db, "notes"), noteDataToSave);
         }
         
-        autoSaveIndicator.innerText = dict[currentLang].saved;
-    } catch (e) { 
-        console.error("Auto-save error: ", e); 
-        autoSaveIndicator.innerText = "❌ Error";
-    }
-}
+        alert(dict[currentLang].saved_success);
+        drawingPage.style.display = 'none'; homePage.style.display = 'flex'; loadNotes();
+        btn.innerText = dict[currentLang].btn_save; 
+        btn.disabled = false;
+    } catch (e) { alert("Error saving."); console.error(e); }
+};
 
 // --- Load Notes ---
 async function loadNotes() {
