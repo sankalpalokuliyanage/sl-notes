@@ -1,5 +1,5 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
-import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy, doc, deleteDoc, updateDoc, where, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+import { getFirestore, collection, addDoc, getDocs, serverTimestamp, query, orderBy, doc, deleteDoc, updateDoc, where, setDoc, getDoc, enableIndexedDbPersistence } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
 import { getAuth, signInWithPopup, GoogleAuthProvider, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
 
 const firebaseConfig = {
@@ -15,6 +15,15 @@ const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
 const provider = new GoogleAuthProvider();
+
+// --- අලුත්: Offline Storage (IndexedDB Persistence) සක්‍රීය කිරීම ---
+enableIndexedDbPersistence(db).catch((err) => {
+    if (err.code == 'failed-precondition') {
+        console.warn("Offline persistence failed: Multiple tabs open.");
+    } else if (err.code == 'unimplemented') {
+        console.warn("Offline persistence failed: Browser does not support it.");
+    }
+});
 
 let currentUser = null;
 let currentLang = 'en'; 
@@ -57,6 +66,21 @@ const userEmailBadge = document.getElementById('userEmailBadge');
 const languageSelect = document.getElementById('languageSelect');
 const noteTitleInput = document.getElementById('noteTitleInput');
 const pageIndicator = document.getElementById('pageIndicator');
+const networkStatusBadge = document.getElementById('networkStatusBadge');
+
+// --- අලුත්: Internet සම්බන්ධතාවය නිරීක්ෂණය කර Badge එක වෙනස් කිරීම ---
+function updateNetworkStatus() {
+    if (navigator.onLine) {
+        networkStatusBadge.innerText = "Online";
+        networkStatusBadge.className = "badge bg-success rounded-pill small";
+    } else {
+        networkStatusBadge.innerText = "Offline (Saved locally)";
+        networkStatusBadge.className = "badge bg-warning text-dark rounded-pill small";
+    }
+}
+window.addEventListener('online', updateNetworkStatus);
+window.addEventListener('offline', updateNetworkStatus);
+updateNetworkStatus();
 
 function applyLanguage(lang) {
     document.querySelectorAll('[data-i18n]').forEach(el => {
@@ -138,9 +162,8 @@ let undoHistory = [];
 let redoHistory = [];
 
 function saveState() {
-    // වත්මන් පිටුවේ තත්ත්වය Undo ලිස්ට් එකට එකතු කිරීම
     undoHistory.push(canvas.toDataURL('image/png'));
-    redoHistory = []; // අලුතින් ඇන්දොත් redo හිස් වේ
+    redoHistory = []; 
 }
 
 function openCanvas(editingId = null, noteData = null) {
@@ -174,7 +197,6 @@ function renderCurrentPage() {
         img.crossOrigin = "Anonymous";
         img.onload = () => { 
             ctx.drawImage(img, 0, 0, canvas.width, canvas.height); 
-            // පරණ ඉතිහාසය හිස් කර වත්මන් රූපය මුල් අවස්ථාව ලෙස තැබීම
             undoHistory = [];
             redoHistory = [];
         };
@@ -255,7 +277,6 @@ window.addEventListener('resize', () => { if (drawingPage.style.display === 'blo
 function clearCanvas() {
     ctx.fillStyle = "#ffffff"; 
     ctx.fillRect(0, 0, canvas.width, canvas.height);
-    // Clear කරන එකත් Undo කරන්න පුළුවන් විදිහට ඉතිහාසයට එකතු කිරීම
     saveState();
 }
 
@@ -269,7 +290,6 @@ function startDrawing(e) {
     if (e.pointerType !== 'pen') return;
     if (e.cancelable) e.preventDefault();
     
-    // අලුතින් ඇඳීම ඇරඹීමට පෙර වත්මන් තත්ත්වය සුරැකීම
     saveState();
     
     isDrawing = true;
@@ -292,7 +312,6 @@ function draw(e) {
     let pressure = e.pressure !== undefined ? e.pressure : 1; 
     let baseWidth = parseFloat(document.getElementById('brushSize').value);
 
-    // Context Configurations මුලින්ම Reset කිරීම (Highlighter එක නිසා වෙනස් විය හැකි බැවින්)
     ctx.globalAlpha = 1.0;
 
     if (currentTool === 'eraser') {
@@ -300,8 +319,8 @@ function draw(e) {
         ctx.lineWidth = baseWidth * 6;
     } else if (currentTool === 'highlighter') {
         ctx.strokeStyle = document.getElementById('colorPicker').value;
-        ctx.globalAlpha = 0.4; // 40% Transparent (පාරදෘශ්‍ය බව)
-        ctx.lineWidth = baseWidth * 4; // Highlighter එක පෑනට වඩා මහතයි
+        ctx.globalAlpha = 0.4; 
+        ctx.lineWidth = baseWidth * 4; 
     } else {
         ctx.strokeStyle = document.getElementById('colorPicker').value;
         ctx.lineWidth = baseWidth * (pressure * 2); 
@@ -323,7 +342,6 @@ function stopDrawing(e) {
     } catch(err) {} 
     
     ctx.beginPath();
-    // Highlighter එක භාවිතයෙන් පසු මුළු කැන්වසයේම Alpha අගය නැවත 1.0 කිරීම
     ctx.globalAlpha = 1.0;
 }
 
@@ -335,7 +353,6 @@ canvas.addEventListener('pointercancel', stopDrawing, { passive: false });
 
 document.getElementById('clearBtn').onclick = clearCanvas;
 
-// --- Tools Management (Pen, Highlighter, Eraser) ---
 const btnPen = document.getElementById('btnPen');
 const btnHighlighter = document.getElementById('btnHighlighter');
 const btnEraser = document.getElementById('btnEraser');
@@ -359,17 +376,12 @@ btnHighlighter.onclick = () => {
 btnEraser.onclick = () => { 
     currentTool = 'eraser'; 
     resetToolButtons();
-    btnEraser.classList.replace('btn-outline-primary', 'btn-primary'); 
+    btnEraser.classList.replace('btn-primary', 'btn-outline-primary'); 
 };
 
-// --- Undo & Redo Actions Logic ---
 document.getElementById('btnUndo').onclick = () => {
     if (undoHistory.length === 0) return;
-    
-    // වත්මන් තත්ත්වය Redo වෙත යැවීම
     redoHistory.push(canvas.toDataURL('image/png'));
-    
-    // පරණ තත්ත්වය ගෙන Canvas එකට ඇඳීම
     let previousState = undoHistory.pop();
     let img = new Image();
     img.crossOrigin = "Anonymous";
@@ -383,10 +395,7 @@ document.getElementById('btnUndo').onclick = () => {
 
 document.getElementById('btnRedo').onclick = () => {
     if (redoHistory.length === 0) return;
-    
-    // වත්මන් තත්ත්වය Undo වෙත යැවීම
     undoHistory.push(canvas.toDataURL('image/png'));
-    
     let nextState = redoHistory.pop();
     let img = new Image();
     img.crossOrigin = "Anonymous";
